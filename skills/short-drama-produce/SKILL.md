@@ -86,6 +86,8 @@ python3 <本技能目录>/scripts/production_tool.py collect <project> --job-id 
 python3 <本技能目录>/scripts/production_tool.py audit <project>
 ```
 
+Windows 上的 `python3` 可能只是应用商店的占位程序，运行失败或弹出商店时改用 `python` 或 `py -3`。
+
 `prepare` 只验证并预览，不生产。`confirm` 只保存与当前 job 指纹绑定的一次性确认。
 `run` 才启动 adapter。`collect` 只取回**已经提交过、已经计费**的那次任务的结果，
 不重新提交、也不需要新的确认——见下面「中断不等于要重跑」。`audit` 只对账本地任务历史、失败后恢复、重复内容尝试和当前输出字节，

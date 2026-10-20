@@ -43,7 +43,7 @@
 
 ### 第一次使用：安装和配置
 
-需要 Node.js（用 `npx` 安装）和 Python 3.9 或更新版本。
+需要 Node.js（用 `npx` 安装）和 Python 3.9 或更新版本。Windows 上从 python.org 安装 Python 时勾选「Add python.exe to PATH」。
 
 1. 安装：
 
