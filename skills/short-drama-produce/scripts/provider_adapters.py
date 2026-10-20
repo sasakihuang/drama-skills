@@ -31,8 +31,15 @@ OPENAI_MODEL = "gpt-image-2"
 MINIMAX_MUSIC_MODEL = "music-3.0"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 SEEDANCE_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
-MINIMAX_BASE_URL = "https://api.minimax.io/v1"
-MINIMAX_VIDEO_BASE_URL = "https://api.minimax.io/v2"
+# An account belongs to one site and its key only works there, so the host is
+# chosen by region; MINIMAX_BASE_URL / MINIMAX_VIDEO_BASE_URL still win when set.
+MINIMAX_REGION_HOSTS = {
+    "cn": "https://api.minimaxi.com",
+    "global": "https://api.minimax.io",
+}
+MINIMAX_DEFAULT_REGION = "cn"
+PROVIDER_ENV_FILE = Path.home() / ".drama-skills" / "providers.env"
+ADAPTER_CONFIG_FILE = Path.home() / ".drama-skills" / "adapters.json"
 MAX_JSON_RESPONSE = 128 * 1024 * 1024
 MAX_OUTPUT_BYTES = 512 * 1024 * 1024
 MAX_REFERENCE_BYTES = 50 * 1024 * 1024
@@ -62,6 +69,74 @@ MINIMAX_VIDEO_ROLES = {
     "reference_image": "image_url",
     "reference_video": "video_url",
     "reference_audio": "audio_url",
+}
+# The v1 (Hailuo) endpoint takes frames only, as plain request fields.
+MINIMAX_HAILUO_ROLES = {"first_frame": "image_url", "last_frame": "image_url"}
+MINIMAX_HAILUO_FRAME_FIELDS = {
+    "first_frame": "first_frame_image",
+    "last_frame": "last_frame_image",
+}
+MINIMAX_HAILUO_PROMPT_LIMIT = 2000
+MINIMAX_HAILUO_IMAGE_LIMIT = 20 * 1024 * 1024
+MINIMAX_HAILUO_RUNNING = {"Preparing", "Queueing", "Processing"}
+
+# Official pay-as-you-go list prices (CNY) on the China site. A subscription
+# plan is drawn down at these same prices, and plans differ in how much they
+# include, so prices -- never plan allowances -- are what gets shown.
+MINIMAX_PRICE_SOURCE = "https://platform.minimax.cn/docs/guides/pricing-paygo"
+MINIMAX_PRICE_CHECKED = "2026-10-20"
+MINIMAX_MODE_LABELS = {
+    "text": "文生视频",
+    "first_frame": "首帧图生",
+    "first_last_frame": "首尾帧",
+    "reference": "多参考（图/视频/音频）",
+}
+MINIMAX_VIDEO_MODELS: dict[str, dict[str, Any]] = {
+    "MiniMax-H3": {
+        "api": "v2",
+        "profile": "minimax-h3",
+        "modes": ("text", "first_frame", "first_last_frame", "reference"),
+        "durations": tuple(range(4, 16)),
+        "per_second": {"768P": 0.50, "2K": 0.80},
+        "summary": "几乎照提示词执行，复杂动作稳；同一次生成带对白和环境声",
+    },
+    "MiniMax-H3-Max": {
+        "api": "v2",
+        "profile": "minimax-h3-max",
+        "modes": ("text", "first_frame", "first_last_frame", "reference"),
+        "durations": tuple(range(5, 16)),
+        "per_second": {"480P": 0.33, "768P": 0.50},
+        "summary": "H3 极速版，不支持 2K；同一次生成带声音",
+    },
+    "MiniMax-Hailuo-2.3-Fast": {
+        "api": "v1",
+        "profile": "minimax-hailuo-2.3-fast",
+        "modes": ("first_frame",),
+        "per_clip": {("768P", 6): 1.35, ("768P", 10): 2.25, ("1080P", 6): 2.31},
+        "summary": "最便宜最快，必须给起始帧；没有声音，动作一复杂容易跑偏",
+    },
+    "MiniMax-Hailuo-2.3": {
+        "api": "v1",
+        "profile": "minimax-hailuo-2.3",
+        "modes": ("text", "first_frame"),
+        "per_clip": {("768P", 6): 2.00, ("768P", 10): 4.00, ("1080P", 6): 3.50},
+        "summary": "可文生可图生；没有声音",
+    },
+    "MiniMax-Hailuo-02": {
+        "api": "v1",
+        "profile": "minimax-hailuo-02",
+        "modes": ("text", "first_frame", "first_last_frame"),
+        "per_clip": {
+            ("512P", 6): 0.60,
+            ("512P", 10): 1.00,
+            ("768P", 6): 2.00,
+            ("768P", 10): 4.00,
+            ("1080P", 6): 3.50,
+        },
+        # 512P is published for single-first-frame jobs only.
+        "first_frame_only": ("512P",),
+        "summary": "Hailuo 里唯一支持首尾帧；512P 最便宜但只能首帧图生；没有声音",
+    },
 }
 # Both providers document a `data:<mime>;base64,<...>` URI as an accepted media
 # input alongside a public URL, so a local project reference needs no upload
@@ -629,7 +704,24 @@ def compile_minimax_h3_payload(
     return body
 
 
-def _minimax_video_runtime_profile() -> tuple[
+def _minimax_video_runtime_profile(model: str = "") -> tuple[
+    frozenset[str] | None, frozenset[str] | None, tuple[int, int] | None
+]:
+    """The configured envelope; built-in catalog values fill what is not set."""
+    ratios, resolutions, duration_range = _minimax_video_env_profile()
+    entry = MINIMAX_VIDEO_MODELS.get(model.strip())
+    if entry is None or entry["api"] != "v2":
+        return ratios, resolutions, duration_range
+    if ratios is None:
+        ratios = frozenset(MINIMAX_VIDEO_RATIOS)
+    if resolutions is None:
+        resolutions = frozenset(entry["per_second"])
+    if duration_range is None:
+        duration_range = (min(entry["durations"]), max(entry["durations"]))
+    return ratios, resolutions, duration_range
+
+
+def _minimax_video_env_profile() -> tuple[
     frozenset[str] | None, frozenset[str] | None, tuple[int, int] | None
 ]:
     def _set(name: str, supported: Collection[str]) -> frozenset[str] | None:
@@ -674,6 +766,129 @@ def _minimax_video_runtime_profile() -> tuple[
             code="invalid_model_profile",
         )
     return allowed_ratios, allowed_resolutions, duration_range
+
+
+def minimax_video_price(model: str, resolution: str, duration: int) -> float:
+    """Official CNY list price of one generation, or ValueError if not offered."""
+    entry = MINIMAX_VIDEO_MODELS.get(model)
+    if entry is None:
+        raise ValueError(
+            f"{model} is not in the built-in MiniMax catalog: "
+            + ", ".join(MINIMAX_VIDEO_MODELS)
+        )
+    if isinstance(duration, bool) or not isinstance(duration, int):
+        raise ValueError("duration must be an integer number of seconds")
+    if entry["api"] == "v2":
+        rate = entry["per_second"].get(resolution)
+        if rate is None or duration not in entry["durations"]:
+            raise ValueError(
+                f"{model} offers {'/'.join(entry['per_second'])} at "
+                f"{min(entry['durations'])}-{max(entry['durations'])} seconds"
+            )
+        return round(rate * duration, 2)
+    price = entry["per_clip"].get((resolution, duration))
+    if price is None:
+        offered = "; ".join(f"{r} {d}s" for r, d in entry["per_clip"])
+        raise ValueError(f"{model} offers only: {offered}")
+    return price
+
+
+def compile_minimax_hailuo_payload(
+    job: Mapping[str, Any],
+    *,
+    model: str,
+    reference_urls: Sequence[str] = (),
+    reference_roles: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Compile a video job into the MiniMax v1 (Hailuo) task body.
+
+    Hailuo takes a start frame and, for Hailuo-02, an end frame as plain fields;
+    there is nothing to point at by name, so no reference contract is appended.
+    """
+    prompt, parameters = _require_job(job, "video")
+    entry = MINIMAX_VIDEO_MODELS.get(model)
+    if entry is None or entry["api"] != "v1":
+        raise ValueError(f"{model} is not a MiniMax Hailuo model")
+    references = job.get("references", [])
+    if not isinstance(references, list) or len(reference_urls) != len(references):
+        raise ValueError("MiniMax reference URLs must match job references")
+    if len(reference_roles) != len(reference_urls):
+        raise ValueError("MiniMax reference roles must match job references")
+    if Path(job["outputs"][0]).suffix.casefold() != ".mp4":
+        raise ValueError("MiniMax video adapter requires an MP4 target")
+    parameters = _take(
+        parameters,
+        {"duration", "ratio", "resolution", "prompt_language", "prompt_optimizer"},
+    )
+    _pop_prompt_language(parameters)
+    if len(prompt) > MINIMAX_HAILUO_PROMPT_LIMIT:
+        raise ValueError(
+            f"Hailuo prompts are limited to {MINIMAX_HAILUO_PROMPT_LIMIT} characters"
+        )
+
+    frames: dict[str, str] = {}
+    for role, url in zip(reference_roles, reference_urls):
+        if role not in MINIMAX_HAILUO_FRAME_FIELDS:
+            raise ValueError(
+                f"Hailuo accepts only first_frame and last_frame references, not {role}"
+            )
+        if role in frames:
+            raise ValueError(f"MiniMax accepts one {role} reference")
+        parsed = urllib.parse.urlparse(url) if isinstance(url, str) else None
+        if not (
+            parsed is not None
+            and ((parsed.scheme == "https" and parsed.netloc) or _is_inline_reference(url))
+        ):
+            raise ValueError("Hailuo frame must be an HTTPS URL or a base64 data URI")
+        frames[role] = url
+    if "last_frame" in frames and "first_frame" not in frames:
+        raise ValueError("Hailuo needs a first_frame whenever a last_frame is given")
+    mode = (
+        "first_last_frame"
+        if "last_frame" in frames
+        else "first_frame"
+        if frames
+        else "text"
+    )
+    if mode not in entry["modes"]:
+        raise ValueError(
+            f"{model} does not support {mode}; it supports "
+            + ", ".join(entry["modes"])
+        )
+
+    duration = parameters.get("duration")
+    resolution = parameters.get("resolution")
+    if not isinstance(resolution, str):
+        raise ValueError("MiniMax video resolution is required")
+    minimax_video_price(model, resolution.strip(), duration)
+    if resolution.strip() in entry.get("first_frame_only", ()) and mode != "first_frame":
+        raise ValueError(f"{model} {resolution.strip()} is only offered with a single first frame")
+
+    ratio = parameters.get("ratio")
+    if ratio is not None:
+        if not isinstance(ratio, str) or ratio.strip() not in MINIMAX_VIDEO_RATIOS:
+            raise ValueError("MiniMax video ratio is outside the supported profile")
+        # The frame decides the shape; text-to-video only renders landscape.
+        if mode == "text" and ratio.strip() != "16:9":
+            raise ValueError(
+                "Hailuo text-to-video only renders 16:9; bind a first frame "
+                "of the wanted shape instead"
+            )
+    optimizer = parameters.get("prompt_optimizer", False)
+    if not isinstance(optimizer, bool):
+        raise ValueError("prompt_optimizer must be a boolean")
+
+    body: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt,
+        "duration": duration,
+        "resolution": resolution.strip(),
+        # Off by default: the prompt was written and accepted on purpose.
+        "prompt_optimizer": optimizer,
+    }
+    for role, url in frames.items():
+        body[MINIMAX_HAILUO_FRAME_FIELDS[role]] = url
+    return body
 
 
 def compile_gpt_image_2_payload(job: Mapping[str, Any]) -> dict[str, Any]:
@@ -909,6 +1124,98 @@ def _credential(name: str) -> str:
     return value
 
 
+def _minimax_region() -> str:
+    region = (os.environ.get("MINIMAX_REGION") or MINIMAX_DEFAULT_REGION).strip().casefold()
+    if region not in MINIMAX_REGION_HOSTS:
+        raise AdapterFailure(
+            "MINIMAX_REGION must be cn or global",
+            category="configuration",
+            code="invalid_region",
+        )
+    return region
+
+
+def _minimax_base(env_name: str, version: str) -> str:
+    return _base_url(env_name, f"{MINIMAX_REGION_HOSTS[_minimax_region()]}/{version}")
+
+
+def _minimax_aigc_watermark() -> bool:
+    """Visible AI-generated label on MiniMax video; on unless explicitly disabled.
+
+    Generated video published in China has to carry an explicit AI label, and
+    the provider's own default is off, so the safe side is chosen here.
+    """
+    raw = os.environ.get("MINIMAX_AIGC_WATERMARK", "true").strip().casefold()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise AdapterFailure(
+        "MINIMAX_AIGC_WATERMARK must be true or false",
+        category="configuration",
+        code="invalid_watermark_setting",
+    )
+
+
+ENV_LINE_RE = re.compile(r"(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*(.*)")
+
+
+def _provider_env_path() -> Path | None:
+    raw = os.environ.get("DRAMA_SKILLS_ENV")
+    if raw:
+        return Path(raw).expanduser()
+    return PROVIDER_ENV_FILE if PROVIDER_ENV_FILE.is_file() else None
+
+
+def _load_provider_env() -> None:
+    """Fill unset variables from the user's own credentials file.
+
+    The file lives outside every project, values already in the environment
+    win, and nothing read here is ever printed or reflected in an error.
+    """
+    path = _provider_env_path()
+    if path is None:
+        return
+    if not path.is_file():
+        raise AdapterFailure(
+            "DRAMA_SKILLS_ENV does not point to a file",
+            category="configuration",
+            code="missing_env_file",
+        )
+    resolved = path.resolve()
+    if any((parent / "short-drama.json").is_file() for parent in resolved.parents):
+        raise AdapterFailure(
+            "the provider credentials file must live outside the project",
+            category="configuration",
+            code="env_file_in_project",
+        )
+    try:
+        text = resolved.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise AdapterFailure(
+            "the provider credentials file is unreadable",
+            category="configuration",
+            code="unreadable_env_file",
+        ) from exc
+    for number, line in enumerate(text.splitlines(), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        match = ENV_LINE_RE.fullmatch(stripped)
+        if match is None:
+            # The line may hold a key, so only its number is reported.
+            raise AdapterFailure(
+                f"the provider credentials file has an invalid line {number}",
+                category="configuration",
+                code="invalid_env_file",
+            )
+        name, value = match.group(1), match.group(2).strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if value and not os.environ.get(name):
+            os.environ[name] = value
+
+
 def _request_json(
     url: str,
     *,
@@ -1074,7 +1381,12 @@ def _binding_roles(
 
 
 def _inline_reference_urls(
-    paths: Sequence[Path], roles: Sequence[str], *, allowed: Mapping[str, str], provider: str
+    paths: Sequence[Path],
+    roles: Sequence[str],
+    *,
+    allowed: Mapping[str, str],
+    provider: str,
+    limits: Mapping[str, int] = INLINE_REFERENCE_LIMITS,
 ) -> list[str]:
     """Encode local project references as `data:` URIs the provider accepts."""
     urls: list[str] = []
@@ -1107,7 +1419,7 @@ def _inline_reference_urls(
         # The bytes have to be the media type the extension claims, or the
         # provider rejects a request this adapter said was well formed.
         _validate_media_content(path.name, content)
-        limit = INLINE_REFERENCE_LIMITS[field]
+        limit = limits[field]
         if len(content) > limit:
             raise AdapterFailure(
                 f"{provider} reference exceeds the {limit // (1024 * 1024)}MB inline "
@@ -1435,7 +1747,7 @@ def _run_openai(job: Mapping[str, Any]) -> tuple[Path, str | None]:
 def _run_minimax(job: Mapping[str, Any]) -> tuple[Path, str | None]:
     token = _credential("MINIMAX_API_KEY")
     body = compile_minimax_music_payload(job)
-    base = _base_url("MINIMAX_BASE_URL", MINIMAX_BASE_URL)
+    base = _minimax_base("MINIMAX_BASE_URL", "v1")
     result, _ = _request_json(
         f"{base}/music_generation",
         provider="minimax-music",
@@ -1473,7 +1785,7 @@ def _run_minimax(job: Mapping[str, Any]) -> tuple[Path, str | None]:
 def _run_minimax_speech(job: Mapping[str, Any]) -> tuple[Path, str | None]:
     token = _credential("MINIMAX_API_KEY")
     body = compile_minimax_speech_payload(job)
-    base = _base_url("MINIMAX_BASE_URL", MINIMAX_BASE_URL)
+    base = _minimax_base("MINIMAX_BASE_URL", "v1")
     result, _ = _request_json(
         f"{base}/t2a_v2",
         provider="minimax-speech",
@@ -1508,13 +1820,18 @@ def _run_minimax_speech(job: Mapping[str, Any]) -> tuple[Path, str | None]:
     )
 
 
-def _run_minimax_video(job: Mapping[str, Any]) -> tuple[Path, str]:
+def _run_minimax_video(
+    job: Mapping[str, Any], model: str | None = None
+) -> tuple[Path, str]:
+    model = (model or os.environ.get("MINIMAX_VIDEO_MODEL", "")).strip()
+    entry = MINIMAX_VIDEO_MODELS.get(model)
+    if entry is not None and entry["api"] == "v1":
+        return _run_minimax_hailuo(job, model)
     token = _credential("MINIMAX_API_KEY")
-    base = _base_url("MINIMAX_VIDEO_BASE_URL", MINIMAX_VIDEO_BASE_URL)
+    base = _minimax_base("MINIMAX_VIDEO_BASE_URL", "v2")
     collecting = _collect_target(job)
     if collecting is not None:
         return _poll_minimax_video(job, base=base, token=token, task_id=collecting)
-    model = os.environ.get("MINIMAX_VIDEO_MODEL", "")
     references = _reference_paths(job)
     reference_roles = (
         _binding_roles(job, allowed=MINIMAX_VIDEO_ROLES, provider="MiniMax")
@@ -1524,7 +1841,7 @@ def _run_minimax_video(job: Mapping[str, Any]) -> tuple[Path, str]:
     reference_urls = _inline_reference_urls(
         references, reference_roles, allowed=MINIMAX_VIDEO_ROLES, provider="MiniMax"
     )
-    ratios, resolutions, duration_range = _minimax_video_runtime_profile()
+    ratios, resolutions, duration_range = _minimax_video_runtime_profile(model)
     body = compile_minimax_h3_payload(
         job,
         model=model,
@@ -1534,6 +1851,7 @@ def _run_minimax_video(job: Mapping[str, Any]) -> tuple[Path, str]:
         allowed_resolutions=resolutions,
         duration_range=duration_range,
     )
+    body["aigc_watermark"] = _minimax_aigc_watermark()
     created, _ = _request_json(
         f"{base}/video_generation",
         provider="minimax-h3",
@@ -1607,6 +1925,332 @@ def _poll_minimax_video(
     )
 
 
+def _minimax_v1_checked(document: Mapping[str, Any], message: str, *, task_id: str | None = None) -> None:
+    base_resp = document.get("base_resp")
+    if isinstance(base_resp, Mapping) and base_resp.get("status_code") not in (0, None):
+        raise AdapterFailure(
+            message,
+            code=_provider_code(document) or "provider_error",
+            request_id=task_id,
+        )
+
+
+def _run_minimax_hailuo(job: Mapping[str, Any], model: str) -> tuple[Path, str]:
+    token = _credential("MINIMAX_API_KEY")
+    base = _minimax_base("MINIMAX_BASE_URL", "v1")
+    collecting = _collect_target(job)
+    if collecting is not None:
+        return _poll_minimax_hailuo(job, base=base, token=token, task_id=collecting)
+    references = _reference_paths(job)
+    reference_roles = (
+        _binding_roles(job, allowed=MINIMAX_HAILUO_ROLES, provider="Hailuo")
+        if references
+        else []
+    )
+    reference_urls = _inline_reference_urls(
+        references,
+        reference_roles,
+        allowed=MINIMAX_HAILUO_ROLES,
+        provider="Hailuo",
+        limits={"image_url": MINIMAX_HAILUO_IMAGE_LIMIT},
+    )
+    body = compile_minimax_hailuo_payload(
+        job,
+        model=model,
+        reference_urls=reference_urls,
+        reference_roles=reference_roles,
+    )
+    body["aigc_watermark"] = _minimax_aigc_watermark()
+    created, _ = _request_json(
+        f"{base}/video_generation",
+        provider="minimax-video",
+        body=body,
+        token=token,
+    )
+    _minimax_v1_checked(created, "MiniMax rejected the video task")
+    task_id = created.get("task_id")
+    if not isinstance(task_id, str) or not task_id:
+        raise AdapterFailure(
+            "MiniMax did not return a task id",
+            code=_provider_code(created) or "missing_task_id",
+        )
+    # Billed from here on. Record the id before the first poll.
+    _record_handle(job, task_id)
+    return _poll_minimax_hailuo(job, base=base, token=token, task_id=task_id)
+
+
+def _poll_minimax_hailuo(
+    job: Mapping[str, Any], *, base: str, token: str, task_id: str
+) -> tuple[Path, str]:
+    try:
+        interval = float(os.environ.get("MINIMAX_VIDEO_POLL_INTERVAL", "5"))
+        deadline = time.monotonic() + float(
+            os.environ.get("MINIMAX_VIDEO_TIMEOUT_SECONDS", "1800")
+        )
+    except ValueError as exc:
+        raise AdapterFailure("MiniMax polling configuration is invalid") from exc
+    if interval <= 0 or deadline <= time.monotonic():
+        raise AdapterFailure("MiniMax polling configuration is invalid")
+    while time.monotonic() < deadline:
+        document, _ = _request_json(
+            f"{base}/query/video_generation?task_id="
+            + urllib.parse.quote(task_id, safe=""),
+            provider="minimax-video",
+            method="GET",
+            token=token,
+        )
+        _minimax_v1_checked(document, "MiniMax video task query failed", task_id=task_id)
+        status = document.get("status")
+        if status == "Success":
+            file_id = document.get("file_id")
+            if isinstance(file_id, int) and not isinstance(file_id, bool):
+                file_id = str(file_id)
+            if not isinstance(file_id, str) or not file_id:
+                raise AdapterFailure(
+                    "MiniMax succeeded without a file id",
+                    code="missing_file_id",
+                    request_id=task_id,
+                )
+            retrieved, _ = _request_json(
+                f"{base}/files/retrieve?file_id=" + urllib.parse.quote(file_id, safe=""),
+                provider="minimax-video",
+                method="GET",
+                token=token,
+            )
+            _minimax_v1_checked(retrieved, "MiniMax file lookup failed", task_id=task_id)
+            file_info = retrieved.get("file")
+            url = file_info.get("download_url") if isinstance(file_info, Mapping) else None
+            if not isinstance(url, str):
+                raise AdapterFailure(
+                    "MiniMax succeeded without a video URL",
+                    code="missing_video_url",
+                    request_id=task_id,
+                )
+            return _download(
+                job, url, job["outputs"][0], provider="minimax-video"
+            ), task_id
+        if status == "Fail":
+            raise AdapterFailure(
+                "MiniMax video task failed",
+                code="task_failed",
+                request_id=task_id,
+            )
+        if status not in MINIMAX_HAILUO_RUNNING:
+            raise AdapterFailure(
+                "MiniMax returned an unknown task status",
+                code="unknown_task_status",
+                request_id=task_id,
+            )
+        time.sleep(interval)
+    raise AdapterFailure(
+        "MiniMax video task polling timed out",
+        category="timeout",
+        code="task_poll_timeout",
+        request_id=task_id,
+        retryable=True,
+    )
+
+
+def _yuan(value: float) -> str:
+    return f"{value:.2f} 元"
+
+
+def price_table() -> str:
+    """Markdown table of the built-in models at official list prices."""
+    lines = [
+        f"MiniMax 视频模型官方价（国内站，人民币；{MINIMAX_PRICE_CHECKED} 按 {MINIMAX_PRICE_SOURCE} 核对）。",
+        "订阅套餐也按这个价格折算扣用量；各套餐额度不同，这里只列价格。",
+        "",
+        "| 模型 | 配置档名 | 能做什么 | 时长 | 分辨率与价格 | 特点 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for model, entry in MINIMAX_VIDEO_MODELS.items():
+        modes = "、".join(MINIMAX_MODE_LABELS[mode] for mode in entry["modes"])
+        if entry["api"] == "v2":
+            durations = f"{min(entry['durations'])}–{max(entry['durations'])} 秒任意整数"
+            prices = "；".join(
+                f"{resolution} {rate:.2f} 元/秒" for resolution, rate in entry["per_second"].items()
+            )
+        else:
+            durations = " 或 ".join(
+                f"{seconds}" for seconds in sorted({d for _, d in entry["per_clip"]})
+            ) + " 秒"
+            by_resolution: dict[str, list[str]] = {}
+            for (resolution, seconds), price in entry["per_clip"].items():
+                by_resolution.setdefault(resolution, []).append(f"{seconds} 秒 {price:.2f} 元")
+            prices = "；".join(
+                f"{resolution}：" + "，".join(items) for resolution, items in by_resolution.items()
+            )
+        lines.append(
+            f"| {model} | `{entry['profile']}` | {modes} | {durations} | {prices} | {entry['summary']} |"
+        )
+    ten: dict[str, float] = {}
+    for model in MINIMAX_VIDEO_MODELS:
+        try:
+            ten[model] = minimax_video_price(model, "768P", 10)
+        except ValueError:
+            continue
+    lines += [
+        "",
+        "同样一段 10 秒 768P："
+        + "，".join(f"{model} {_yuan(price)}" for model, price in sorted(ten.items(), key=lambda item: item[1]))
+        + "。",
+    ]
+    if _minimax_region_or_default() == "global":
+        lines.append("你配置的是国际站（MINIMAX_REGION=global），国际站按美元另行计价，上表只作对比参考。")
+    return "\n".join(lines)
+
+
+def _minimax_region_or_default() -> str:
+    try:
+        return _minimax_region()
+    except AdapterFailure:
+        return MINIMAX_DEFAULT_REGION
+
+
+def _profile_models(config_path: Path | None) -> dict[str, str]:
+    """Adapter profile name -> MiniMax model, from the catalog and a config file."""
+    mapping = {entry["profile"]: model for model, entry in MINIMAX_VIDEO_MODELS.items()}
+    if config_path is None or not config_path.is_file():
+        return mapping
+    try:
+        document = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return mapping
+    adapters = document.get("adapters") if isinstance(document, Mapping) else None
+    for profile, selected in (adapters or {}).items():
+        command = selected.get("command") if isinstance(selected, Mapping) else None
+        if isinstance(command, list) and "--model" in command[:-1]:
+            mapping[profile] = command[command.index("--model") + 1]
+    return mapping
+
+
+def quote_jobs(job_files: Sequence[Path], *, model: str | None, config_path: Path | None) -> str:
+    """Official-price estimate of prepared video jobs, before anything is spent."""
+    profiles = _profile_models(config_path)
+    lines = [
+        "| 任务 | 模型 | 分辨率 | 时长 | 官方价 |",
+        "|---|---|---|---|---|",
+    ]
+    total = 0.0
+    seconds = 0
+    counted = 0
+    for job_file in job_files:
+        job = json.loads(Path(job_file).read_text(encoding="utf-8"))
+        if not isinstance(job, Mapping):
+            raise ValueError(f"{job_file} is not a job object")
+        job_id = job.get("job_id", Path(job_file).stem)
+        if job.get("modality") != "video":
+            lines.append(f"| {job_id} | — | — | — | 不是视频任务，不计价 |")
+            continue
+        chosen = model or profiles.get(str(job.get("adapter")))
+        if chosen is None:
+            raise ValueError(
+                f"{job_id}: adapter profile {job.get('adapter')!r} is not a known MiniMax "
+                "video model; pass --model"
+            )
+        parameters = job.get("parameters") if isinstance(job.get("parameters"), Mapping) else {}
+        resolution = str(parameters.get("resolution", ""))
+        duration = parameters.get("duration")
+        price = minimax_video_price(chosen, resolution, duration)
+        total += price
+        seconds += duration
+        counted += 1
+        lines.append(f"| {job_id} | {chosen} | {resolution} | {duration} 秒 | {_yuan(price)} |")
+    lines += [
+        "",
+        f"合计 {counted} 段视频、{seconds} 秒，按官方价约 {_yuan(round(total, 2))}"
+        "（订阅套餐按这个价格折算扣用量）。",
+    ]
+    return "\n".join(lines)
+
+
+def write_adapter_config(path: Path, *, force: bool) -> Path:
+    """Write a ready adapter config, one profile per built-in model."""
+    path = path.expanduser()
+    if path.exists() and not force:
+        raise FileExistsError(f"{path} already exists; pass --force to replace it")
+    script = str(Path(__file__).resolve())
+    python = sys.executable or "python3"
+    adapters: dict[str, Any] = {}
+    for model, entry in MINIMAX_VIDEO_MODELS.items():
+        if entry["api"] == "v2":
+            roles = sorted(MINIMAX_VIDEO_ROLES)
+        elif "first_last_frame" in entry["modes"]:
+            roles = ["first_frame", "last_frame"]
+        else:
+            roles = ["first_frame"]
+        adapters[entry["profile"]] = {
+            "command": [python, script, "minimax-video", "--model", model],
+            "timeout_seconds": 3600,
+            "reference_roles": roles,
+        }
+    adapters["gpt-image-2"] = {
+        "command": [python, script, "gpt-image-2"],
+        "timeout_seconds": 900,
+    }
+    adapters["minimax-speech"] = {
+        "command": [python, script, "minimax-speech"],
+        "timeout_seconds": 600,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"adapters": adapters}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def write_env_template(path: Path) -> bool:
+    """Copy the blank credentials template; never touches an existing file."""
+    path = path.expanduser()
+    if path.exists():
+        return False
+    template = Path(__file__).resolve().parent.parent / "references" / "providers.env.example"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+    return True
+
+
+def check_config() -> str:
+    """Which settings are present -- never their secret values."""
+    env_path = _provider_env_path()
+    lines = [f"凭据文件：{env_path if env_path else '没有（' + str(PROVIDER_ENV_FILE) + ' 不存在）'}"]
+    try:
+        _load_provider_env()
+    except AdapterFailure as exc:
+        lines.append(f"凭据文件有问题：{exc}")
+    minimax_key = os.environ.get("MINIMAX_API_KEY", "")
+    if not minimax_key:
+        lines.append("MINIMAX_API_KEY：未配置")
+    elif minimax_key.startswith("sk-cp-"):
+        lines.append("MINIMAX_API_KEY：已配置（订阅套餐 Key）")
+    else:
+        lines.append("MINIMAX_API_KEY：已配置（不是 sk-cp- 开头，可能是按量付费 Key，会直接扣账户余额）")
+    try:
+        region = _minimax_region()
+        lines.append(f"MINIMAX_REGION：{region}（{MINIMAX_REGION_HOSTS[region]}）")
+    except AdapterFailure:
+        lines.append("MINIMAX_REGION：填错了，只能是 cn 或 global")
+    lines.append("OPENAI_API_KEY：" + ("已配置" if os.environ.get("OPENAI_API_KEY") else "未配置"))
+    base = urllib.parse.urlparse(os.environ.get("OPENAI_BASE_URL", ""))
+    lines.append(
+        "OPENAI_BASE_URL："
+        + (f"{base.scheme}://{base.hostname}{base.path}" if base.hostname else "未配置（会直连 OpenAI 官方）")
+    )
+    lines.append("adapter 配置：" + (str(ADAPTER_CONFIG_FILE) if ADAPTER_CONFIG_FILE.is_file() else "还没生成"))
+    return "\n".join(lines)
+
+
+def _reconfigure_stdout() -> None:
+    # Chinese tables on a Windows console that is not UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            continue
+
+
 def _selftest() -> None:
     image = {
         "modality": "image", "prompt": "portrait", "references": [],
@@ -1661,6 +2305,26 @@ def _selftest() -> None:
         pass
     else:
         raise AssertionError("MiniMax text-to-video without a ratio was accepted")
+    hailuo = compile_minimax_hailuo_payload(
+        {**video, "references": ["start.png"],
+         "parameters": {"duration": 6, "ratio": "9:16", "resolution": "768P"}},
+        model="MiniMax-Hailuo-2.3-Fast",
+        reference_urls=["data:image/png;base64,AAAA"],
+        reference_roles=["first_frame"],
+    )
+    if hailuo.get("first_frame_image") != "data:image/png;base64,AAAA" or "ratio" in hailuo:
+        raise RuntimeError("MiniMax Hailuo self-test failed")
+    if minimax_video_price("MiniMax-Hailuo-2.3-Fast", "768P", 10) != 2.25:
+        raise RuntimeError("MiniMax price self-test failed")
+    try:
+        compile_minimax_hailuo_payload(
+            {**video, "parameters": {"duration": 6, "resolution": "768P"}},
+            model="MiniMax-Hailuo-2.3-Fast",
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Hailuo Fast text-to-video was accepted")
     compiled_music = compile_minimax_music_payload(music)
     if compiled_music["model"] != MINIMAX_MUSIC_MODEL:
         raise RuntimeError("MiniMax model self-test failed")
@@ -1698,17 +2362,74 @@ def main() -> int:
         nargs="?",
         choices=(
             "seedance", "gpt-image-2", "minimax-music", "minimax-h3",
-            "minimax-speech",
+            "minimax-video", "minimax-speech",
         ),
     )
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument(
+        "--model",
+        choices=tuple(MINIMAX_VIDEO_MODELS),
+        help="MiniMax video model for minimax-video (and for --quote)",
+    )
+    parser.add_argument(
+        "--price-table", action="store_true", help="print official MiniMax video prices"
+    )
+    parser.add_argument(
+        "--quote", nargs="+", type=Path, metavar="JOB", help="price prepared video job files"
+    )
+    parser.add_argument(
+        "--adapter-config",
+        type=Path,
+        default=ADAPTER_CONFIG_FILE,
+        help="adapter config used by --quote to map profiles to models",
+    )
+    parser.add_argument(
+        "--write-config",
+        nargs="?",
+        const=ADAPTER_CONFIG_FILE,
+        type=Path,
+        metavar="PATH",
+        help="write an adapter config with one profile per built-in model",
+    )
+    parser.add_argument("--force", action="store_true", help="replace an existing --write-config file")
+    parser.add_argument(
+        "--check-config", action="store_true", help="show which settings are present, never values"
+    )
     args = parser.parse_args()
     if args.selftest:
         _selftest()
         return 0
+    if args.price_table or args.quote or args.write_config or args.check_config:
+        _reconfigure_stdout()
+        try:
+            _load_provider_env()
+        except AdapterFailure:
+            pass  # --check-config reports it; the tables do not need credentials
+        try:
+            if args.write_config:
+                written = write_adapter_config(args.write_config, force=args.force)
+                created = write_env_template(PROVIDER_ENV_FILE)
+                print(f"adapter 配置已写入：{written}")
+                print(
+                    f"凭据文件：{PROVIDER_ENV_FILE}"
+                    + ("（新建的空模板，请自己填 Key）" if created else "（已存在，没有改动）")
+                )
+            if args.check_config:
+                print(check_config())
+            if args.price_table:
+                print(price_table())
+            if args.quote:
+                print(quote_jobs(args.quote, model=args.model, config_path=args.adapter_config))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        return 0
     if args.provider is None:
         parser.error("provider is required unless --selftest is used")
+    if args.model and args.provider not in {"minimax-video", "minimax-h3"}:
+        parser.error("--model only applies to minimax-video")
     try:
+        _load_provider_env()
         job = json.load(sys.stdin.buffer)
         if not isinstance(job, Mapping):
             raise ValueError("adapter input must be an object")
@@ -1716,7 +2437,8 @@ def main() -> int:
             "seedance": _run_seedance,
             "gpt-image-2": _run_openai,
             "minimax-music": _run_minimax,
-            "minimax-h3": _run_minimax_video,
+            "minimax-h3": lambda job: _run_minimax_video(job, args.model),
+            "minimax-video": lambda job: _run_minimax_video(job, args.model),
             "minimax-speech": _run_minimax_speech,
         }
         path, provider_job_id = runners[args.provider](job)

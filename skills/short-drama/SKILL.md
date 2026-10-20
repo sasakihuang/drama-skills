@@ -58,6 +58,9 @@ license: MIT
 8. 用户在会话里点名目标视频模型（“按 MiniMax H3 写”“用 Seedance 2.5”）而 `short-drama.json` 的
    `production_profile` 还是 `unset` 时，先把这个选择连同它带来的原生时长、参考方式和正文语言写进档案，
    再继续下游阶段。把已确认选择写入档案，后续请求才能沿用同一方言、语言和时长边界。
+   创作者要选或换 MiniMax 视频模型（H3、H3-Max、Hailuo）、或问用哪个时，先运行同级技能目录里的
+   `short-drama-produce/scripts/provider_adapters.py --price-table`，把官方价目表给他看再定；只列价格，
+   不提任何套餐额度。
 
 ## 初始化与 Dashboard
 
@@ -91,8 +94,8 @@ python3 {技能目录}/scripts/project_tool.py set-authority <project> \
   --decision-ref "创作者决策/production-profile.jsonl#CD-H3"
 ```
 
-各字段取值由命中的模型方言给出：`$short-drama-video-prompts` 的 MiniMax H3 / Seedance / Wan 3.0 方言文件都写了
-推荐档案。写完用 `status` 复核 `video_model_profile` 是否已经出现。
+各字段取值由命中的模型方言给出：`$short-drama-video-prompts` 的 MiniMax H3 / MiniMax Hailuo / Seedance / Wan 3.0
+方言文件都写了推荐档案。写完用 `status` 复核 `video_model_profile` 是否已经出现。
 
 语速 `format.pacing` 和集数 `format.episode_count` 走同样的决策写入：`--field /format/pacing`，
 `accepted_value` 写 `{"spoken_characters_per_second": <每秒可发声字数>, "seconds_per_action_paragraph": <每段动作秒数>}`，

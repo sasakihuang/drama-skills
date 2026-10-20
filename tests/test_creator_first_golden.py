@@ -113,6 +113,7 @@ EXPECTED_KNOWHOW = {
         "generability.md",
         "motion-recipe.md",
         "minimax-h3.md",
+        "minimax-hailuo.md",
         "performance-action-timing.md",
         "production-prompt-grammar.md",
         "review-and-fixtures.md",

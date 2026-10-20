@@ -44,8 +44,10 @@ license: MIT
 剧本和声音方向决定，不能从提示词正文语言推断。
 
 目标为 `seedance-2.0` 时按 [Seedance 2.0 方言](references/seedance-2.0.md) 写，目标为
-`seedance-2.5` 时按 [Seedance 2.5 方言](references/seedance-2.5.md) 写，目标为 `minimax-h3` 时按
-[MiniMax H3 方言](references/minimax-h3.md) 写，目标为 `wan-3.0` 时按 [Wan 3.0 方言](references/wan-3.0.md)
+`seedance-2.5` 时按 [Seedance 2.5 方言](references/seedance-2.5.md) 写，目标为 `minimax-h3` 或
+`minimax-h3-max` 时按 [MiniMax H3 方言](references/minimax-h3.md) 写（H3-Max 时长 5–15 秒、不支持 2K），
+目标为 `minimax-hailuo-2.3-fast`、`minimax-hailuo-2.3` 或 `minimax-hailuo-02` 时按
+[MiniMax Hailuo 方言](references/minimax-hailuo.md) 写，目标为 `wan-3.0` 时按 [Wan 3.0 方言](references/wan-3.0.md)
 写。只读命中的一份。其他目标或版本不
 套用相近模型的语法，继续按 [目标模型能力档案](references/target-model-profile.md) 的通用路径写。
 
@@ -149,6 +151,7 @@ license: MIT
 - Seedance 2.0 的中文分镜、素材与声音语法：[Seedance 2.0 方言](references/seedance-2.0.md)
 - Seedance 2.5 的长叙事、时间戳和任务类型语法：[Seedance 2.5 方言](references/seedance-2.5.md)
 - MiniMax H3 的结构化正文、参考模式与逐切关键帧容器：[MiniMax H3 方言](references/minimax-h3.md)
+- MiniMax Hailuo 的单段正文、只认起始帧与方括号运镜：[MiniMax Hailuo 方言](references/minimax-hailuo.md)
 - Wan 3.0 的中文正文、素材编号与多镜时间段：[Wan 3.0 方言](references/wan-3.0.md)
 - 多镜容器或静态漫剧的交付方式：[交付形态](references/delivery-profile.md)
 - 完成前的边界检查：[审查与示例](references/review-and-fixtures.md)

@@ -6,8 +6,13 @@ Adapter command:
 {"command": ["python3", "/absolute/path/provider_adapters.py", "minimax-music"], "timeout_seconds": 600}
 ```
 
-Required environment: `MINIMAX_API_KEY`. `MINIMAX_BASE_URL` optionally overrides the default
-`https://api.minimax.io/v1` and must remain HTTPS.
+Required environment: `MINIMAX_API_KEY`. The host follows `MINIMAX_REGION`: `cn` (default,
+`https://api.minimaxi.com/v1`) or `global` (`https://api.minimax.io/v1`). `MINIMAX_BASE_URL`
+optionally overrides it and must remain HTTPS. These may also be set in `~/.drama-skills/providers.env`;
+see the [MiniMax video adapter](minimax-h3-video.md#environment).
+
+MiniMax stopped offering music generation to new users on 2026-08-20; on such an account the call is
+refused (observed with a subscription key: HTTP 410, code 2153). Use licensed music in the edit instead.
 
 The job uses the suite's `music` modality and must have exactly one output. The production prompt becomes the
 music style/mood prompt. Supported public parameters are `lyrics`, `is_instrumental`, `sample_rate`,

@@ -1096,11 +1096,11 @@ class ProviderRuntimeTests(unittest.TestCase):
 
         self.assertEqual(
             requested[0],
-            ("POST", "https://api.minimax.io/v2/video_generation"),
+            ("POST", "https://api.minimaxi.com/v2/video_generation"),
         )
         self.assertEqual(
             requested[1],
-            ("GET", "https://api.minimax.io/v2/query/video_generation/task-1"),
+            ("GET", "https://api.minimaxi.com/v2/query/video_generation/task-1"),
         )
         create = requested[0]
         self.assertNotIn("/query/", create[1])

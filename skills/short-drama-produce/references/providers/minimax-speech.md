@@ -6,8 +6,10 @@ Adapter command:
 {"command": ["python3", "/absolute/path/provider_adapters.py", "minimax-speech"], "timeout_seconds": 600}
 ```
 
-Required environment: `MINIMAX_API_KEY`. `MINIMAX_BASE_URL` optionally overrides the default
-`https://api.minimax.io/v1` and must remain HTTPS.
+Required environment: `MINIMAX_API_KEY`. The host follows `MINIMAX_REGION`: `cn` (default,
+`https://api.minimaxi.com/v1`) or `global` (`https://api.minimax.io/v1`). `MINIMAX_BASE_URL`
+optionally overrides it and must remain HTTPS. These may also be set in `~/.drama-skills/providers.env`;
+see the [MiniMax video adapter](minimax-h3-video.md#environment).
 
 The job uses the suite's `tts` modality and must have exactly one output. The production prompt is the
 line to be spoken, verbatim — not a description of it. Supported public parameters are `model`,

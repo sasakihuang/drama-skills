@@ -52,6 +52,7 @@ python3 {技能目录}/scripts/production_tool.py prepare <project> --job <临�
 2. 运行 `prepare`，把返回的完整预览展示给创作者，尤其是数量、prompt、source entry、
    reference bindings、references、outputs、overwrite 与 adapter。creator-first job 会在这一步机械核对
    所选标题里的可复制提示词，以及参考图槽位、顺序、路径、中文名和控制边界；任一漂移都 fail closed。
+   内置 MiniMax 视频 job 还要附上 `--quote` 算出的官方价，见[选视频模型与看价格](#选视频模型与看价格)。
 3. 等创作者在**看到这份预览之后**明确确认。只有明确同意这项当前任务，才运行 `confirm`；
    “继续”“都做完”“预算没问题”、上游内容已接受或之前确认过另一版，都不算本次生产确认。
 4. 运行 `run`。它会在启动 adapter 前消费一次确认；成功或失败后再次执行都必须重新确认，
@@ -118,8 +119,9 @@ python3 <本技能目录>/scripts/production_tool.py audit <project>
 
 ## Adapter 边界
 
-adapter 配置必须在项目外，包含 argv 命令、超时和可选的 `reference_roles`；凭据由 adapter 从进程环境或系统凭据
-存储读取。项目 job、确认记录、运行记录和 Dashboard 都不得保存密钥。
+adapter 配置必须在项目外，包含 argv 命令、超时和可选的 `reference_roles`；凭据由 adapter 从进程环境、系统凭据
+存储或用户主目录下的 `~/.drama-skills/providers.env` 读取（进程环境里已有的同名项优先）。项目 job、确认记录、
+运行记录和 Dashboard 都不得保存密钥。
 
 脚本以 JSON stdin 调用 argv 数组，不使用 shell，不拼接命令。adapter 返回本地临时文件；工具只
 接受与已确认 targets 完全一致的结果，并把完整文件原子复制到项目的 `剧集/<EP>/制作成果/`
@@ -134,20 +136,49 @@ adapter 配置必须在项目外，包含 argv 命令、超时和可选的 `refe
 - [Seedance](references/providers/seedance.md)：模型/Endpoint ID 必须由账号显式配置；compiler 支持
   图片、视频和音频参考 role，本地参考文件由内置 runtime 编码为 data URI 发送。
 - [GPT Image 2](references/providers/gpt-image-2.md)：无参考图走 generation，有参考图走 edit；
-  固定高保真引用并校验尺寸、格式与透明背景限制。
+  固定高保真引用并校验尺寸、格式与透明背景限制。Key 和中转地址（默认模板填的是 yoyo）由用户自己配置。
 - [MiniMax Music](references/providers/minimax-music.md)：使用 `music-3.0` 与 hex 结果，区分主题曲
-  和纯配乐，不伪造时长请求字段。
+  和纯配乐，不伪造时长请求字段。官方自 2026-08-20 起不对新用户开放音乐生成，新账号调用会被拒。
 - [MiniMax 语音](references/providers/minimax-speech.md)：`tts` 模态；模型与 `voice_id` 都必须
   由账号与文档显式给出，不内置音色清单。只从预置音色合成，不做声音克隆；创作者授权的参考录音
   按普通创作者输入放在 `输入/`，不能据此声称本适配器会读取或克隆它。
-- [MiniMax H3 视频](references/providers/minimax-h3-video.md)：模型 ID、分辨率集合与时长区间必须
-  由账号显式配置；提示词进 `content` 的 text 项，本地参考按显式 role 绑定并编码为 data URI。
-  该模型与画面同一次生成声音，写法影响见 `$short-drama-video-prompts` 的目标模型能力档案。
+- [MiniMax 视频](references/providers/minimax-h3-video.md)：内置 MiniMax-H3、MiniMax-H3-Max 与
+  MiniMax-Hailuo-2.3-Fast / 2.3 / 02 五个模型的接口版本、分辨率、时长和官方价，用 `--model` 选；
+  其他模型 ID 仍须由账号显式配置分辨率集合与时长区间。默认国内站，国际站账号设 `MINIMAX_REGION=global`；
+  默认打开视频上的「AI 生成」标识。H3 系列的提示词进 `content` 的 text 项，本地参考按显式 role 绑定并编码为
+  data URI，与画面同一次生成声音；Hailuo 系列走老接口，只收起始帧（Hailuo-02 还收结束帧），没有声音。
+  写法影响见 `$short-drama-video-prompts` 的目标模型能力档案。
 
 这些 adapter 实现本文列出的请求契约；账号可用性需由部署方核实，生成质量需另行观察和审查。
 正式生产仍须经过本次预览后的明确确认。
 
 仓库自带 `fixture_adapter.py` 只用于离线测试，不代表真实生成质量或默认生产 adapter。
+
+## 选视频模型与看价格
+
+创作者选视频模型、换模型，或问“用哪个模型”“多少钱”时，先运行：
+
+```text
+python3 <本技能目录>/scripts/provider_adapters.py --price-table
+```
+
+把输出的价目表原样给创作者看，再请他选。**只列官方价格**：不换算、不提任何订阅套餐的额度、百分比或
+“还剩多少”——各套餐包含的用量不同，统一以价格为准。选定后，video job 的 `adapter` 写该模型的配置档名
+（价目表第二列，例如 `minimax-hailuo-2.3-fast`），`parameters` 的 `resolution` 与 `duration` 必须是该模型价目里有的组合。
+
+每批 video job `prepare` 之后、请创作者确认之前，运行：
+
+```text
+python3 <本技能目录>/scripts/provider_adapters.py --quote <job.json> [<job.json> ...]
+```
+
+把逐条官方价和合计跟预览一起展示。报价报错说明这个分辨率、时长组合该模型不提供，job 提交时同样会失败；
+回去改参数或换模型，重新 prepare。
+
+Hailuo 系列与 H3 系列的差别会改变上游写法：Hailuo 只认起始帧（Hailuo-02 另认结束帧），不收人物、场景、
+道具参考图或参考音频，没有声音；Hailuo-2.3-Fast 必须有起始帧；时长只有 6 或 10 秒，1080P 只有 6 秒；
+提示词不超过 2000 字；画幅跟着起始帧走，文生视频只出 16:9。选 Hailuo 时，视频提示词按
+`$short-drama-video-prompts` 的 Hailuo 方言写。
 
 ## 中断不等于要重跑
 
@@ -182,6 +213,19 @@ adapter 配置必须在项目外，包含 argv 命令、超时和可选的 `refe
 Dashboard 只负责展示这些文件和运行摘要，不提供 adapter 设置或生产按钮。
 
 ## 安装维护
+
+第一次使用内置 adapter 时运行一次：
+
+```text
+python3 <本技能目录>/scripts/provider_adapters.py --write-config
+```
+
+它在用户主目录生成 `~/.drama-skills/adapters.json`（每个内置视频模型一个配置档，另有 `gpt-image-2` 和
+`minimax-speech`；`run`/`collect` 的 `--adapter-config` 就填这个文件）和空白凭据模板
+`~/.drama-skills/providers.env`。请创作者**自己**用记事本打开 providers.env 填 Key：MiniMax Key 与国内/国际站、
+画图用的 Key（`OPENAI_BASE_URL` 已预填 yoyo 中转地址，用别的中转就改这一行）。不要让创作者把 Key 发进对话，
+也不要替他写进文件。填好后运行 `--check-config` 核对：它只显示每项有没有配置、MiniMax Key 像不像订阅 Key，
+从不显示 Key 本身。
 
 只有安装、升级或排障时运行离线自检；普通创作和生产准备不运行：
 

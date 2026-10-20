@@ -15,8 +15,10 @@ ALLOWED_PROVIDER_URLS = {
     "skills/short-drama-produce/scripts/provider_adapters.py": {
         "https://api.openai.com/v1",
         "https://ark.cn-beijing.volces.com/api/v3",
-        "https://api.minimax.io/v1",
-        "https://api.minimax.io/v2",
+        # MiniMax region hosts and the published price list the catalog cites.
+        "https://api.minimaxi.com",
+        "https://api.minimax.io",
+        "https://platform.minimax.cn/docs/guides/pricing-paygo",
     },
     "skills/short-drama-produce/references/providers/seedance.md": {
         "https://ark.cn-beijing.volces.com/api/v3",
@@ -24,21 +26,29 @@ ALLOWED_PROVIDER_URLS = {
     },
     "skills/short-drama-produce/references/providers/gpt-image-2.md": {
         "https://api.openai.com/v1",
+        # The relay the credentials template points image generation at.
+        "https://api.yoyochatai.com/v1",
         "https://developers.openai.com/api/docs/models/gpt-image-2",
         "https://developers.openai.com/api/reference/resources/images/methods/generate",
         "https://developers.openai.com/api/reference/resources/images/methods/edit",
     },
     "skills/short-drama-produce/references/providers/minimax-music.md": {
+        "https://api.minimaxi.com/v1",
         "https://api.minimax.io/v1",
         "https://platform.minimax.io/docs/api-reference/music-generation",
     },
     "skills/short-drama-produce/references/providers/minimax-speech.md": {
+        "https://api.minimaxi.com/v1",
         "https://api.minimax.io/v1",
         "https://platform.minimax.io/docs/api-reference/speech-t2a-http",
     },
     "skills/short-drama-produce/references/providers/minimax-h3-video.md": {
-        "https://api.minimax.io/v2",
+        "https://api.minimaxi.com",
+        "https://api.minimax.io",
         "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+        "https://platform.minimaxi.com/docs/api-reference/video-generation-i2v",
+        "https://platform.minimaxi.com/docs/api-reference/video-generation-fl2v",
+        "https://platform.minimax.cn/docs/guides/pricing-paygo",
     },
     # The optional Remotion subtitle route names its own project so the licence
     # question has somewhere to be answered. It is documentation, not an endpoint
@@ -52,6 +62,10 @@ ALLOWED_PROVIDER_URLS = {
         "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
         "https://github.com/MiniMax-AI/cli/blob/main/skill/h3-video/references/h3-video.md",
         "https://platform.minimax.io/docs/api-reference/video-generation-v2-h3-context-ir",
+    },
+    "skills/short-drama-video-prompts/references/minimax-hailuo.md": {
+        "https://platform.minimaxi.com/docs/api-reference/video-generation-i2v",
+        "https://platform.minimaxi.com/docs/api-reference/video-generation-fl2v",
     },
     "skills/short-drama-video-prompts/references/seedance-2.0.md": {
         "https://docs.volcengine.com/docs/82379/1520757",
@@ -171,7 +185,7 @@ class ShippingBoundaryTests(unittest.TestCase):
         leaks: list[str] = []
         seen: dict[str, set[str]] = {}
         for path in shipped_text_files():
-            relative = str(path.relative_to(SUITE))
+            relative = path.relative_to(SUITE).as_posix()
             for found in url.findall(path.read_text(encoding="utf-8")):
                 seen.setdefault(relative, set()).add(found)
                 if found not in ALLOWED_PROVIDER_URLS.get(relative, set()):

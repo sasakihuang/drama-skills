@@ -31,6 +31,38 @@
   <a href="https://t.me/+CZmsmvWIhb4zZTNl"><img alt="Telegram 交流群" src="https://img.shields.io/badge/Telegram%20%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?style=for-the-badge&logo=telegram&logoColor=white"></a>
 </p>
 
+## 这个分支改了什么
+
+这是 [zenstory-ai/drama-skills](https://github.com/zenstory-ai/drama-skills) 的分支，其余用法和原版一样，只改了生产环节：
+
+- **MiniMax 默认走国内站**（`api.minimaxi.com`）。国际站账号在凭据文件里写 `MINIMAX_REGION=global`。
+- **视频模型可选**：内置 MiniMax-H3、MiniMax-H3-Max、MiniMax-Hailuo-2.3-Fast、MiniMax-Hailuo-2.3、MiniMax-Hailuo-02。
+  选模型时列出官方价格，每批视频生成前按镜头算出要花多少钱。只列价格、不列套餐额度：各套餐包含的用量不同，统一以价格为准。
+- **画图走 GPT Image 2 的 yoyo 中转**，Key 由每个人自己配置。
+- 视频默认打上 MiniMax 的「AI 生成」标识（国内发布要求标明 AI 生成）。
+
+### 第一次使用：安装和配置
+
+需要 Node.js（用 `npx` 安装）和 Python 3.9 或更新版本。
+
+1. 安装：
+
+   ```bash
+   npx skills add sasakihuang/drama-skills -y -g
+   ```
+
+2. 在 Codex 里说：「用 $short-drama-produce 做第一次配置」。它会运行 `provider_adapters.py --write-config`，
+   在你的用户主目录生成 `.drama-skills/adapters.json` 和一份空白的 `.drama-skills/providers.env`。
+3. 用记事本打开 `providers.env`，**自己**填：
+   - `MINIMAX_API_KEY`：MiniMax 后台的 Key。订阅套餐的 Key 一般是 `sk-cp-` 开头；按量付费的 Key 会直接扣账户余额。
+   - `MINIMAX_REGION`：国内站填 `cn`，国际站填 `global`。
+   - `OPENAI_API_KEY`：yoyo 后台生成的 Key（`OPENAI_BASE_URL` 已经填好 yoyo 地址）。
+
+   Key 只写在这个文件里：不要发到对话里，不要放进短剧项目文件夹，不要提交到 git。
+4. 让 Codex 运行一次 `--check-config` 核对。它只显示每一项有没有配置，不显示 Key。
+
+想看各模型价格，对 Codex 说「列一下视频模型的价格」。下面是原版说明。
+
 <video src="https://github.com/user-attachments/assets/640db65d-bd57-4924-83de-9c5852c1db26" controls muted playsinline width="100%"></video>
 
 上面这段 68 秒竖屏样片是《让你管账号》第 1 集开头：从一部 20 章的原著改编，分镜 20 镜，逐镜生成后剪成成片，
