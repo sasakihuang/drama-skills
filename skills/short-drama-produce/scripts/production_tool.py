@@ -871,11 +871,16 @@ def _markdown_reference_bindings(
         and re.fullmatch(r"无(?:外部参考)?(?:；[^\n]*)?。?", value)
     ):
         return []
-    # Drawing a shot's own start frame is how a 「；待补参考图：……」 gap after the
-    # real REF slots gets filled, so that gap names no input of this job; every
-    # other job still refuses it below.
+    # Drawing a shot's own start frame is how a 「；待补参考图：本镜起始帧」 gap
+    # after the real REF slots gets filled, so that gap names no input of this
+    # job. A missing identity, place or prop board is still an input the frame
+    # needs, so any other gap -- and every other job -- is still refused below.
     if creator_supplied_ok:
-        value = re.sub(r"；待补参考图：.*$", "", value).strip()
+        pending = re.search(r"；待补参考图：(.*)$", value)
+        if pending and all(
+            "起始帧" in gap for gap in pending.group(1).rstrip("。").split("、") if gap.strip()
+        ):
+            value = value[: pending.start()].strip()
     # A `PLAN-...` slot is a picture the creator attaches in their own tool, so
     # this suite has no file to send. The rendering job that draws a shot's own
     # start frame is unaffected -- it works from the frozen keyframe text, the

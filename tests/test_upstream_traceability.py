@@ -253,6 +253,13 @@ class CreatorSuppliedReferenceTests(EpisodeFixture):
         self.assertEqual([binding["slot_id"] for binding in bindings], ["REF-ZHOUBOSEN"])
         with self.assertRaises(ValueError):
             production_tool._markdown_reference_bindings(section, field_name="输入参考图")
+        # A board the frame still needs is not waived along with the frame.
+        with self.assertRaises(ValueError):
+            production_tool._markdown_reference_bindings(
+                section.replace("本镜起始帧", "取衣牌背面、本镜起始帧"),
+                field_name="输入参考图",
+                creator_supplied_ok=True,
+            )
 
     def test_a_plan_cannot_be_sent_to_production(self) -> None:
         """The suite holds no file for these pictures, so a job would be a lie."""
