@@ -1195,17 +1195,21 @@ def _validate_stored_job(
         or source is None
     ):
         raise ValueError("stored job source entry is invalid")
-    expected_entry_prefix = {"image": "IMG-", "video": "MOTION-"}.get(
-        str(modality)
+    creator_source_modality = _canonical_creator_source_modality(
+        str(source) if source is not None else None
+    )
+    expected_entry_prefix = (
+        CREATOR_SOURCE_ENTRIES[PurePosixPath(source).name][0]
+        if source is not None
+        and PurePosixPath(source).name in CREATOR_SOURCE_ENTRIES
+        and creator_source_modality == modality
+        else None
     )
     if source_entry is not None and (
         expected_entry_prefix is None
         or not source_entry.startswith(expected_entry_prefix)
     ):
         raise ValueError("stored job source entry has the wrong modality")
-    creator_source_modality = _canonical_creator_source_modality(
-        str(source) if source is not None else None
-    )
     if not legacy and creator_source_modality == modality and source_entry is None:
         raise ValueError("stored creator Markdown job has no source entry")
     if creator_source_modality is not None and modality != creator_source_modality and not (

@@ -771,6 +771,27 @@ class ConfirmedProductionTests(unittest.TestCase):
                 preview["outputs"], ["剧集/EP001/制作成果/images/SHOT-EP001-001.png"]
             )
 
+            try:
+                confirmation = production_tool.confirm_job(
+                    root,
+                    job_id=str(preview["job_id"]),
+                    confirmation=str(preview["confirmation"]),
+                )
+            except ValueError as error:
+                self.fail(f"Prepared storyboard keyframe could not be confirmed: {error}")
+            self.assertEqual(confirmation["state"], "confirmed")
+            result = production_tool.run_job(
+                root,
+                job_id=str(preview["job_id"]),
+                adapter_config=self.adapter_config(directory),
+            )
+            self.assertEqual(result["state"], "succeeded")
+            self.assertTrue((root / preview["outputs"][0]).is_file())
+            self.assertEqual(
+                production_tool.job_status(root, job_id=str(preview["job_id"]))["state"],
+                "succeeded",
+            )
+
             with self.assertRaisesRegex(ValueError, "does not match the job modality"):
                 production_tool.prepare_job(
                     root, write(source_entry="MOTION-EP001-001")
