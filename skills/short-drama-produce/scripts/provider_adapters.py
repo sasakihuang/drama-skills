@@ -2101,6 +2101,45 @@ def price_table() -> str:
     return "\n".join(lines)
 
 
+def estimate_table(durations: Sequence[int]) -> str:
+    """Official total for a planned set of clips, per model and resolution.
+
+    Used to ask the creator to pick a video model before any job exists, so each
+    option can carry what this film would cost with it.
+    """
+    if not durations or any(isinstance(d, bool) or not isinstance(d, int) or d < 1 for d in durations):
+        raise ValueError("--estimate takes one positive whole number of seconds per planned clip")
+    plan = "、".join(str(d) for d in durations)
+    rows: list[tuple[float, str]] = []
+    missing: list[str] = []
+    for model, entry in MINIMAX_VIDEO_MODELS.items():
+        resolutions = (
+            list(entry["per_second"])
+            if entry["api"] == "v2"
+            else list(dict.fromkeys(resolution for resolution, _ in entry["per_clip"]))
+        )
+        for resolution in resolutions:
+            try:
+                total = round(sum(minimax_video_price(model, resolution, d) for d in durations), 2)
+            except ValueError:
+                missing.append(f"{model} {resolution}")
+                continue
+            rows.append(
+                (total, f"| {model} | `{entry['profile']}` | {resolution} | {_yuan(total)} | {entry['summary']} |")
+            )
+    lines = [
+        f"按计划的 {len(durations)} 段视频（{plan} 秒，共 {sum(durations)} 秒）估算官方价，从便宜到贵：",
+        "",
+        "| 模型 | 配置档名 | 分辨率 | 这条片子合计 | 特点 |",
+        "|---|---|---|---|---|",
+        *(row for _, row in sorted(rows, key=lambda item: item[0])),
+    ]
+    if missing:
+        lines += ["", "这些组合没有计划里的时长，要用就得改镜长：" + "；".join(missing) + "。"]
+    lines.append("订阅套餐也按这个价格折算扣用量；这里只列价格。")
+    return "\n".join(lines)
+
+
 def _minimax_region_or_default() -> str:
     try:
         return _minimax_region()
@@ -2378,6 +2417,13 @@ def main() -> int:
         "--quote", nargs="+", type=Path, metavar="JOB", help="price prepared video job files"
     )
     parser.add_argument(
+        "--estimate",
+        nargs="+",
+        type=int,
+        metavar="SECONDS",
+        help="price a planned set of clips (one length per clip) on every model and resolution",
+    )
+    parser.add_argument(
         "--adapter-config",
         type=Path,
         default=ADAPTER_CONFIG_FILE,
@@ -2399,7 +2445,7 @@ def main() -> int:
     if args.selftest:
         _selftest()
         return 0
-    if args.price_table or args.quote or args.write_config or args.check_config:
+    if args.price_table or args.quote or args.estimate or args.write_config or args.check_config:
         _reconfigure_stdout()
         try:
             _load_provider_env()
@@ -2418,6 +2464,8 @@ def main() -> int:
                 print(check_config())
             if args.price_table:
                 print(price_table())
+            if args.estimate:
+                print(estimate_table(args.estimate))
             if args.quote:
                 print(quote_jobs(args.quote, model=args.model, config_path=args.adapter_config))
         except (OSError, ValueError, json.JSONDecodeError) as exc:

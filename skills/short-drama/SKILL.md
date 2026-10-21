@@ -59,10 +59,13 @@ license: MIT
 8. 用户在会话里点名目标视频模型（“按 MiniMax H3 写”“用 Seedance 2.5”）而 `short-drama.json` 的
    `production_profile` 还是 `unset` 时，先把这个选择连同它带来的原生时长、参考方式和正文语言写进档案，
    再继续下游阶段。把已确认选择写入档案，后续请求才能沿用同一方言、语言和时长边界。
-   创作者要选或换 MiniMax 视频模型（H3、H3-Max、Hailuo）、或问用哪个时，先运行同级技能目录里的
-   `short-drama-produce/scripts/provider_adapters.py --price-table`，把官方价目表给他看再定；只列价格，
-   不提任何套餐额度。流程已经走到要用目标模型的地方（分镜排镜长、写视频提示词、首帧出完准备做视频），档案却还是
-   `unset`、创作者也没点名时，不要只留一句「视频模型待选定」：主动运行同一条命令给他看价格、请他选，选定后照上面写进档案。
+   视频模型和分辨率只能由创作者亲手选，不能替他定。创作者要选或换 MiniMax 视频模型（H3、H3-Max、Hailuo）、
+   或问用哪个时，先运行同级技能目录里的 `short-drama-produce/scripts/provider_adapters.py --price-table`，把官方
+   价目表给他看再定；只列价格，不提任何套餐额度。流程已经走到要用目标模型的地方（分镜排镜长、写视频提示词、
+   首帧出完准备做视频），档案却还是 `unset`、创作者也没点名时，不要只留一句「视频模型待选定」：主动给他看价目表，
+   再按 `$short-drama-produce` 的「选视频模型与看价格」用 `--estimate` 算出这条片子在各模型上的合计价，**单独**
+   用选项卡问他选哪个，选定后照上面写进档案。提议制作方案、画幅或风格时，选项里不写死模型、不让他顺带选中；
+   改版重做使镜头数或时长变了，就带着新价格重新问，不写「沿用」。
 9. 写完图片提示词或冻结关键帧、项目里还没有这些图时，运行同级技能目录里的
    `short-drama-produce/scripts/provider_adapters.py --check-config`（只显示每项有没有配置，从不显示 Key）。
    显示 `OPENAI_API_KEY：已配置`、`adapter 配置` 后面是文件路径，就是本机已配好内置出图：默认下一步是转
@@ -71,7 +74,8 @@ license: MIT
    不要让创作者自己去别处出图，除非他说要自己做。创作者说过「按流程来」「走完流程」「出图」「生成预览图」这类话，
    就算点名了这批出图，直接 `prepare` 并展示预览；没说过就在回报里把它作为推荐下一步问他。`prepare` 不花钱；
    花钱的 `run` 仍守 `$short-drama-produce` 的硬闸门：每个 job 先给预览，创作者看过后明确确认才运行，不代他确认；
-   确认默认用弹窗（`confirm --dialog`），不要为了等确认结束这一轮。
+   确认默认用你所在界面自带的选项卡（Codex 的 `request_user_input`、Claude Code 的 `AskUserQuestion`），
+   界面没有选项卡时才用系统弹窗（`confirm --dialog`），做法见 `$short-drama-produce` 的硬闸门；不要为了等确认结束这一轮。
    出完把图给他看，满意后由分镜 owner 绑成 `REF-...` 继续；要做视频而模型未定时按第 8 条先给价目表。
    没配好时照第 7 条给三条路，并说明第一次配置按 `$short-drama-produce` 的「安装维护」做。
 

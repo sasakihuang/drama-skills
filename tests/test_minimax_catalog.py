@@ -411,6 +411,22 @@ class PriceTests(unittest.TestCase):
         with isolated(MINIMAX_REGION="global"):
             self.assertIn("国际站", provider_adapters.price_table())
 
+    def test_estimate_prices_a_planned_film_on_every_offered_combination(self) -> None:
+        table = provider_adapters.estimate_table([10, 10, 10])
+        self.assertIn("3 段视频（10、10、10 秒，共 30 秒）", table)
+        self.assertIn("| MiniMax-Hailuo-2.3-Fast | `minimax-hailuo-2.3-fast` | 768P | 6.75 元 |", table)
+        self.assertIn("| MiniMax-H3 | `minimax-h3` | 768P | 15.00 元 |", table)
+        self.assertIn("| MiniMax-H3 | `minimax-h3` | 2K | 24.00 元 |", table)
+        self.assertIn("MiniMax-Hailuo-2.3-Fast 1080P", table.split("改镜长：", 1)[1])
+        self.assertLess(table.index("6.75 元"), table.index("24.00 元"))
+        self.assertNotIn("%", table)
+        odd = provider_adapters.estimate_table([8])
+        self.assertIn("| MiniMax-H3 | `minimax-h3` | 768P | 4.00 元 |", odd)
+        self.assertNotIn("| MiniMax-Hailuo-2.3-Fast |", odd)
+        for bad in ([], [0], [True]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                provider_adapters.estimate_table(bad)
+
     def test_quote_prices_each_job_by_profile_or_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
