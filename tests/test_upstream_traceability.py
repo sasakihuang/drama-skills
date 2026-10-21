@@ -239,6 +239,21 @@ class CreatorSuppliedReferenceTests(EpisodeFixture):
             [],
         )
 
+    def test_a_pending_start_frame_does_not_block_rendering_it(self) -> None:
+        """Boards made first are bound as REF; the start frame is still the gap."""
+        section = (
+            "## SHOT-EP001-001 · 年轻的手\n"
+            "- 输入参考图：REF-ZHOUBOSEN（顺序：1）· 剧集/EP001/制作成果/images/周薄森.png"
+            "《周薄森角色板》（用途：身份；控制：手型、本集常服；不得控制：构图、动作）"
+            "；待补参考图：本镜起始帧\n"
+        )
+        bindings = production_tool._markdown_reference_bindings(
+            section, field_name="输入参考图", creator_supplied_ok=True
+        )
+        self.assertEqual([binding["slot_id"] for binding in bindings], ["REF-ZHOUBOSEN"])
+        with self.assertRaises(ValueError):
+            production_tool._markdown_reference_bindings(section, field_name="输入参考图")
+
     def test_a_plan_cannot_be_sent_to_production(self) -> None:
         """The suite holds no file for these pictures, so a job would be a lie."""
         section = (
