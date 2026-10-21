@@ -188,7 +188,8 @@ python3 <本技能目录>/scripts/provider_adapters.py --check-config
 ```
 
 显示 `OPENAI_API_KEY：已配置`、`adapter 配置` 后面是文件路径，就用内置的 `gpt-image-2` 配置档出图，不要让创作者
-自己去别处出图：job 的 `modality` 写 `image`、`adapter` 写 `gpt-image-2`，一个 job 只出一张图，输出放
+自己去别处出图，也不要改用你所在环境自带的出图工具（例如 Codex 的 `image_gen` 或 imagegen 技能）：那样没有价格确认、
+可能已经在创作者的账号或中转上计费，图也不进项目。创作者明确说要用自带工具时才用。内置 `gpt-image-2` 的做法是：job 的 `modality` 写 `image`、`adapter` 写 `gpt-image-2`，一个 job 只出一张图，输出放
 `剧集/<EP>/制作成果/images/`。资产图从《图片提示词.md》的 `IMG-*` 取，首帧从《分镜.md》的 `SHOT-*` 取；先出资产图、
 交分镜 owner 绑成 `REF-...`，首帧再挂着它们出。尺寸写进 `parameters` 的 `width` 和 `height`：两边都是 16 的倍数、
 长短边之比不超过 3:1，9:16 竖屏首帧可用 864×1536，横屏反过来。每张都走上面的[硬闸门](#硬闸门)：`prepare`、
