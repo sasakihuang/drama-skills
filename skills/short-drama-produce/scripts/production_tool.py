@@ -1328,6 +1328,131 @@ def confirm_job(root: Path, *, job_id: str, confirmation: str) -> dict[str, Any]
     return {"job_id": job_id, "state": "confirmed"}
 
 
+MODALITY_NAMES = {"image": "图片", "video": "视频", "tts": "配音", "music": "音乐"}
+
+
+def _price_line(job: Mapping[str, Any]) -> str:
+    """Official price of a built-in MiniMax video job, from the sibling adapter."""
+    if job["modality"] != "video":
+        return "按所用服务商的价格计费，本工具不估算"
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "short_drama_provider_adapters", Path(__file__).with_name("provider_adapters.py")
+        )
+        if spec is None or spec.loader is None:
+            raise ImportError("provider adapters are missing")
+        adapters = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapters)
+        model = adapters._profile_models(adapters.ADAPTER_CONFIG_FILE).get(str(job["adapter"]))
+        if model is None:
+            return "不是内置 MiniMax 视频模型，本工具不估算"
+        parameters = job["parameters"]
+        price = adapters.minimax_video_price(
+            model, str(parameters.get("resolution", "")), parameters.get("duration")
+        )
+    except (ImportError, OSError, ValueError, AttributeError, SyntaxError):
+        return "未能估算，请看对话里的报价"
+    return f"{model} 官方价 {price:.2f} 元"
+
+
+def _dialog_message(job: Mapping[str, Any]) -> str:
+    parameters = job["parameters"]
+    shown = [
+        f"{name} {parameters[name]}"
+        for name in ("resolution", "duration", "ratio", "width", "height", "quality")
+        if name in parameters
+    ]
+    references = [str(binding.get("label", binding.get("path"))) for binding in job["reference_bindings"]]
+    prompt = str(job["prompt"]).strip()
+    return "\n".join(
+        [
+            "即将调用付费接口生成，请核对：",
+            "",
+            f"任务：{job['job_id']}（{MODALITY_NAMES.get(str(job['modality']), job['modality'])}，"
+            f"{len(job['outputs'])} 个）",
+            f"配置档：{job['adapter']}",
+            "参数：" + ("，".join(shown) if shown else "无"),
+            "参考图：" + ("、".join(references) if references else "无"),
+            "输出：" + "；".join(job["outputs"]),
+            "价格：" + _price_line(job),
+            "",
+            "提示词开头：",
+            prompt[:300] + ("……" if len(prompt) > 300 else ""),
+            "",
+            "点「是」生成，点「否」不生成。",
+        ]
+    )
+
+
+def _native_dialog(title: str, message: str) -> bool | None:
+    """Yes/no in a system dialog, defaulting to no; None when none can be shown."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            yes_no, question, second_default, set_foreground, topmost = (
+                0x4, 0x20, 0x100, 0x10000, 0x40000
+            )
+            answer = ctypes.windll.user32.MessageBoxW(  # type: ignore[attr-defined]
+                None, message, title, yes_no | question | second_default | set_foreground | topmost
+            )
+        except (AttributeError, OSError):
+            return None
+        return None if answer == 0 else answer == 6
+    if sys.platform == "darwin":
+        script = (
+            "on run argv\n"
+            'display dialog (item 1 of argv) with title (item 2 of argv) '
+            'buttons {"否", "是"} default button "否" cancel button "否" with icon caution\n'
+            "end run"
+        )
+        try:
+            completed = subprocess.run(
+                ["osascript", "-e", script, message, title],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return None
+        if completed.returncode == 0:
+            return "是" in completed.stdout
+        return False if "-128" in completed.stderr else None
+    try:
+        import tkinter
+        from tkinter import messagebox
+
+        window = tkinter.Tk()
+        window.withdraw()
+        window.attributes("-topmost", True)
+        try:
+            return bool(messagebox.askyesno(title, message, default="no", parent=window))
+        finally:
+            window.destroy()
+    except Exception:
+        return None
+
+
+def confirm_with_dialog(root: Path, *, job_id: str, ask: Any = None) -> dict[str, Any]:
+    """Confirm the exact prepared job by the creator's click in a system dialog.
+
+    The dialog itself shows the job, so the click is made after seeing it; the
+    receipt is the same one-shot, fingerprint-bound confirmation as `confirm`.
+    """
+    root = find_project(root)
+    job = _read_job(root, job_id)
+    expected = _preview(job)["confirmation"]
+    answer = (ask or _native_dialog)("确认生成？", _dialog_message(job))
+    if answer is None:
+        return {"job_id": job_id, "state": "dialog_unavailable"}
+    if not answer:
+        return {"job_id": job_id, "state": "declined"}
+    result = confirm_job(root, job_id=job_id, confirmation=expected)
+    return {**result, "via": "dialog"}
+
+
 def _inputs_current(root: Path, job: Mapping[str, Any]) -> bool:
     inputs = job.get("inputs")
     if not isinstance(inputs, Mapping):
@@ -2286,7 +2411,13 @@ def build_parser() -> argparse.ArgumentParser:
     confirm = commands.add_parser("confirm", help="Confirm the exact prepared job.")
     confirm.add_argument("project")
     confirm.add_argument("--job-id", required=True)
-    confirm.add_argument("--confirmation", required=True)
+    how = confirm.add_mutually_exclusive_group(required=True)
+    how.add_argument("--confirmation")
+    how.add_argument(
+        "--dialog",
+        action="store_true",
+        help="ask the creator in a system dialog that shows the job and its price",
+    )
     run = commands.add_parser("run", help="Execute a confirmed job through an adapter.")
     run.add_argument("project")
     run.add_argument("--job-id", required=True)
@@ -2313,6 +2444,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "prepare":
             result = prepare_job(Path(args.project), Path(args.job))
+        elif args.command == "confirm" and args.dialog:
+            result = confirm_with_dialog(Path(args.project), job_id=args.job_id)
+            print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+            return {"confirmed": 0, "declined": 3}.get(result["state"], 4)
         elif args.command == "confirm":
             result = confirm_job(
                 Path(args.project), job_id=args.job_id, confirmation=args.confirmation

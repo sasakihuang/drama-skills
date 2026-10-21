@@ -53,13 +53,20 @@ python3 {技能目录}/scripts/production_tool.py prepare <project> --job <临�
    reference bindings、references、outputs、overwrite 与 adapter。creator-first job 会在这一步机械核对
    所选标题里的可复制提示词，以及参考图槽位、顺序、路径、中文名和控制边界；任一漂移都 fail closed。
    内置 MiniMax 视频 job 还要附上 `--quote` 算出的官方价，见[选视频模型与看价格](#选视频模型与看价格)。
-3. 等创作者在**看到这份预览之后**明确确认。只有明确同意这项当前任务，才运行 `confirm`；
+3. 等创作者在**看到这份预览之后**明确确认。**默认用弹窗确认**：把预览贴进对话后，不要结束这一轮、不要在对话里
+   等文字回复，直接运行 `confirm --dialog`。它弹出系统对话框，列出本次任务、配置档、参数、参考图、输出、价格和
+   提示词开头，默认按钮是「否」；创作者点「是」才写入确认（返回 `confirmed`），接着在同一轮运行 `run`；点「否」
+   （返回 `declined`）就停下，回报这一项没有生成。命令会一直等到创作者点按钮，运行时把命令超时设长（至少 10 分钟），
+   等待期间不要放弃、重试或另起一个弹窗。返回 `dialog_unavailable`（没有图形界面，例如远程或沙盒里），或创作者
+   说过要在对话里确认时，才退回旧办法：在对话里等他回复本次确认，再运行 `confirm --confirmation`。
    “继续”“都做完”“预算没问题”、上游内容已接受或之前确认过另一版，都不算本次生产确认。
 4. 运行 `run`。它会在启动 adapter 前消费一次确认；成功或失败后再次执行都必须重新确认，
    防止失败重试意外产生第二笔费用。
 
 job、prompt、参数、输出路径或直接输入任一变化，旧确认立即失效。不得代替创作者填写确认。
-当前已确认 job 是本轮唯一工作单元；运行结束后回报结果并交还控制权，不自动准备下一批或启动审查。
+创作者在本次请求里已经点名后续步骤（例如「按流程走完」「出完首帧接着做视频」）时，一个 job 运行完可以在同一轮
+接着 `prepare` 下一个，照样逐个弹窗确认，并在弹窗前把上一步的结果（例如刚出的首帧）先给他看；没点名的下一批、
+审查不自动开始。
 
 `分镜.md` 的「输入参考图」路径只是创作阶段的可读依据与使用意图，不是生产输入快照。进入生产时，
 creator-first job 必须从拥有提示词的 `图片提示词.md`、`分镜.md` 或 `视频提示词.md` 对应条目建立绑定；`prepare` 展示的
@@ -79,6 +86,7 @@ creator-first job 必须从拥有提示词的 `图片提示词.md`、`分镜.md`
 
 ```text
 python3 <本技能目录>/scripts/production_tool.py prepare <project> --job <job.json>
+python3 <本技能目录>/scripts/production_tool.py confirm <project> --job-id <id> --dialog
 python3 <本技能目录>/scripts/production_tool.py confirm <project> --job-id <id> --confirmation "CONFIRM <id> <code>"
 python3 <本技能目录>/scripts/production_tool.py run <project> --job-id <id> --adapter-config <outside-project-config.json>
 python3 <本技能目录>/scripts/production_tool.py status <project> --job-id <id>
@@ -88,7 +96,8 @@ python3 <本技能目录>/scripts/production_tool.py audit <project>
 
 Windows 上的 `python3` 可能只是应用商店的占位程序，运行失败或弹出商店时改用 `python` 或 `py -3`。
 
-`prepare` 只验证并预览，不生产。`confirm` 只保存与当前 job 指纹绑定的一次性确认。
+`prepare` 只验证并预览，不生产。`confirm` 只保存与当前 job 指纹绑定的一次性确认；`--dialog` 由创作者在弹窗里点
+「是」给出这次确认，退出码 0 表示已确认、3 表示点了「否」、4 表示弹不出窗。
 `run` 才启动 adapter。`collect` 只取回**已经提交过、已经计费**的那次任务的结果，
 不重新提交、也不需要新的确认——见下面「中断不等于要重跑」。`audit` 只对账本地任务历史、失败后恢复、重复内容尝试和当前输出字节，
 不会调用供应商，也不把技术成功、文件存在或哈希一致写成媒体质量结论。同一 job 存在未决
@@ -169,7 +178,7 @@ python3 <本技能目录>/scripts/provider_adapters.py --check-config
 `剧集/<EP>/制作成果/images/`。资产图从《图片提示词.md》的 `IMG-*` 取，首帧从《分镜.md》的 `SHOT-*` 取；先出资产图、
 交分镜 owner 绑成 `REF-...`，首帧再挂着它们出。尺寸写进 `parameters` 的 `width` 和 `height`：两边都是 16 的倍数、
 长短边之比不超过 3:1，9:16 竖屏首帧可用 864×1536，横屏反过来。每张都走上面的[硬闸门](#硬闸门)：`prepare`、
-展示预览、等创作者看过后明确确认、再 `run`。出完把图片路径给创作者、把图显示出来请他看；满意后交分镜 owner
+展示预览、弹窗请创作者确认、再 `run`。出完把图片路径给创作者、把图显示出来请他看；满意后交分镜 owner
 绑成 `REF-...`（首帧写 `用途：起始帧`），不满意就回提示词负责技能修改，再重新 `prepare`。接下来要做视频而目标
 模型还没定时，先按下一节给价目表。没显示已配置时，按[安装维护](#安装维护)请创作者先配好。
 
