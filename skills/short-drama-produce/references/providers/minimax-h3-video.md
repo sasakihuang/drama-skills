@@ -24,6 +24,13 @@ explicit profile described under "Environment".
 | MiniMax-Hailuo-2.3 | `minimax-hailuo-2.3` | v1 | text, first frame | 6 or 10 s | 768P 6 s 2.00, 10 s 4.00; 1080P 6 s 3.50 |
 | MiniMax-Hailuo-02 | `minimax-hailuo-02` | v1 | text, first frame, first+last frame | 6 or 10 s | 512P 6 s 0.60, 10 s 1.00 (first frame only); 768P 6 s 2.00, 10 s 4.00; 1080P 6 s 3.50 |
 
+The H3 series also charges for input material (`MINIMAX_INPUT_FEE_SOURCE`): MiniMax-H3 takes 5
+images per generation free and 0.20 per extra image; MiniMax-H3-Max takes 2 free and 0.50 per extra
+image. First and last frames count as images, reference audio is free, and an input video is billed by
+its length (H3: 768P 0.50/s, 2K 0.80/s; H3-Max: 480P 0.37/s, 768P 0.97/s). Hailuo has no input fee.
+`--quote` and the confirmation price add the image fee from the job's reference bindings and flag,
+without pricing, any reference video; `--estimate ... --images N` adds it for a planned film.
+
 Prices are the China-site pay-as-you-go list, checked on the date stored in
 `MINIMAX_PRICE_CHECKED`. A subscription plan is drawn down at these same prices and plans differ in
 what they include, so the creator is shown prices only, never a plan allowance:

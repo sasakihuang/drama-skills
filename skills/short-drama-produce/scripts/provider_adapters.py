@@ -85,6 +85,12 @@ MINIMAX_HAILUO_RUNNING = {"Preparing", "Queueing", "Processing"}
 # include, so prices -- never plan allowances -- are what gets shown.
 MINIMAX_PRICE_SOURCE = "https://platform.minimax.cn/docs/guides/pricing-paygo"
 MINIMAX_PRICE_CHECKED = "2026-10-20"
+# H3-series input-material fees are published on the overview page: images past
+# a free allowance cost a flat fee each (first/last frames are images too), audio
+# is free, and an input video is billed by its length at a per-resolution rate.
+MINIMAX_INPUT_FEE_SOURCE = "https://platform.minimax.cn/docs/pricing/overview"
+MINIMAX_INPUT_FEE_CHECKED = "2026-10-22"
+MINIMAX_IMAGE_ROLES = frozenset({"first_frame", "last_frame", "reference_image"})
 MINIMAX_MODE_LABELS = {
     "text": "文生视频",
     "first_frame": "首帧图生",
@@ -98,6 +104,9 @@ MINIMAX_VIDEO_MODELS: dict[str, dict[str, Any]] = {
         "modes": ("text", "first_frame", "first_last_frame", "reference"),
         "durations": tuple(range(4, 16)),
         "per_second": {"768P": 0.50, "2K": 0.80},
+        "free_images": 5,
+        "extra_image": 0.20,
+        "input_video_per_second": {"768P": 0.50, "2K": 0.80},
         "summary": "几乎照提示词执行，复杂动作稳；同一次生成带对白和环境声",
     },
     "MiniMax-H3-Max": {
@@ -106,6 +115,9 @@ MINIMAX_VIDEO_MODELS: dict[str, dict[str, Any]] = {
         "modes": ("text", "first_frame", "first_last_frame", "reference"),
         "durations": tuple(range(5, 16)),
         "per_second": {"480P": 0.33, "768P": 0.50},
+        "free_images": 2,
+        "extra_image": 0.50,
+        "input_video_per_second": {"480P": 0.37, "768P": 0.97},
         "summary": "H3 极速版，不支持 2K；同一次生成带声音",
     },
     "MiniMax-Hailuo-2.3-Fast": {
@@ -791,6 +803,52 @@ def minimax_video_price(model: str, resolution: str, duration: int) -> float:
         offered = "; ".join(f"{r} {d}s" for r, d in entry["per_clip"])
         raise ValueError(f"{model} offers only: {offered}")
     return price
+
+
+def minimax_image_fee(model: str, images: int) -> float:
+    """Input-image fee of one H3-series generation; Hailuo charges none."""
+    entry = MINIMAX_VIDEO_MODELS.get(model)
+    if entry is None:
+        raise ValueError(f"{model} is not in the built-in MiniMax catalog")
+    if entry["api"] != "v2":
+        return 0.0
+    return round(max(0, images - entry["free_images"]) * entry["extra_image"], 2)
+
+
+def _job_image_and_video_inputs(job: Mapping[str, Any]) -> tuple[int, int]:
+    bindings = job.get("reference_bindings")
+    if isinstance(bindings, list) and bindings:
+        roles = [str(binding.get("role", "")) for binding in bindings if isinstance(binding, Mapping)]
+        return (
+            sum(role in MINIMAX_IMAGE_ROLES for role in roles),
+            sum(role == "reference_video" for role in roles),
+        )
+    references = job.get("references")
+    paths = [str(path).lower() for path in references] if isinstance(references, list) else []
+    return (
+        sum(path.endswith((".png", ".jpg", ".jpeg", ".webp")) for path in paths),
+        sum(path.endswith((".mp4", ".mov")) for path in paths),
+    )
+
+
+def minimax_job_price(model: str, job: Mapping[str, Any]) -> tuple[float, str]:
+    """Official price of one prepared video job, input fees included, and a note.
+
+    Every image the job sends counts toward the free allowance, first and last
+    frames included, so the figure errs high rather than low. An input video is
+    billed by its length, which a job does not record; it is flagged, not priced.
+    """
+    parameters = job.get("parameters") if isinstance(job.get("parameters"), Mapping) else {}
+    price = minimax_video_price(model, str(parameters.get("resolution", "")), parameters.get("duration"))
+    images, videos = _job_image_and_video_inputs(job)
+    fee = minimax_image_fee(model, images)
+    notes = []
+    if fee:
+        extra = images - MINIMAX_VIDEO_MODELS[model]["free_images"]
+        notes.append(f"含输入图超出免费额度的 {extra} 张 {_yuan(fee)}")
+    if videos and MINIMAX_VIDEO_MODELS[model]["api"] == "v2":
+        notes.append("参考视频按输入时长另收费，未算入")
+    return round(price + fee, 2), "；".join(notes)
 
 
 def compile_minimax_hailuo_payload(
@@ -2095,20 +2153,44 @@ def price_table() -> str:
         "同样一段 10 秒 768P："
         + "，".join(f"{model} {_yuan(price)}" for model, price in sorted(ten.items(), key=lambda item: item[1]))
         + "。",
+        "",
+        input_fee_note(),
     ]
     if _minimax_region_or_default() == "global":
         lines.append("你配置的是国际站（MINIMAX_REGION=global），国际站按美元另行计价，上表只作对比参考。")
     return "\n".join(lines)
 
 
-def estimate_table(durations: Sequence[int]) -> str:
+def input_fee_note() -> str:
+    """One paragraph on the H3-series input-material fees, from the catalog."""
+    parts = []
+    for model, entry in MINIMAX_VIDEO_MODELS.items():
+        if entry["api"] != "v2":
+            continue
+        video = "、".join(f"{r} {rate:.2f} 元/秒" for r, rate in entry["input_video_per_second"].items())
+        parts.append(
+            f"{model} 每次生成输入图 {entry['free_images']} 张以内免费、超出每张 {entry['extra_image']:.2f} 元，"
+            f"参考视频按输入时长 {video}"
+        )
+    return (
+        f"H3 系列另收输入素材费（{MINIMAX_INPUT_FEE_CHECKED} 按 {MINIMAX_INPUT_FEE_SOURCE} 核对）："
+        + "；".join(parts)
+        + "。首帧、尾帧也算输入图，参考音频免费；Hailuo 系列没有这项费用。"
+    )
+
+
+def estimate_table(durations: Sequence[int], *, images: int = 0) -> str:
     """Official total for a planned set of clips, per model and resolution.
 
     Used to ask the creator to pick a video model before any job exists, so each
-    option can carry what this film would cost with it.
+    option can carry what this film would cost with it. `images` is how many
+    images each clip sends (first frame and references); H3-series fees past the
+    free allowance are added per clip.
     """
     if not durations or any(isinstance(d, bool) or not isinstance(d, int) or d < 1 for d in durations):
         raise ValueError("--estimate takes one positive whole number of seconds per planned clip")
+    if isinstance(images, bool) or not isinstance(images, int) or images < 0:
+        raise ValueError("--images takes a whole number of images sent with each clip")
     plan = "、".join(str(d) for d in durations)
     rows: list[tuple[float, str]] = []
     missing: list[str] = []
@@ -2120,15 +2202,20 @@ def estimate_table(durations: Sequence[int]) -> str:
         )
         for resolution in resolutions:
             try:
-                total = round(sum(minimax_video_price(model, resolution, d) for d in durations), 2)
+                total = round(
+                    sum(minimax_video_price(model, resolution, d) for d in durations)
+                    + minimax_image_fee(model, images) * len(durations),
+                    2,
+                )
             except ValueError:
                 missing.append(f"{model} {resolution}")
                 continue
             rows.append(
                 (total, f"| {model} | `{entry['profile']}` | {resolution} | {_yuan(total)} | {entry['summary']} |")
             )
+    sent = f"，每段带 {images} 张输入图" if images else ""
     lines = [
-        f"按计划的 {len(durations)} 段视频（{plan} 秒，共 {sum(durations)} 秒）估算官方价，从便宜到贵：",
+        f"按计划的 {len(durations)} 段视频（{plan} 秒，共 {sum(durations)} 秒{sent}）估算官方价，从便宜到贵：",
         "",
         "| 模型 | 配置档名 | 分辨率 | 这条片子合计 | 特点 |",
         "|---|---|---|---|---|",
@@ -2136,7 +2223,9 @@ def estimate_table(durations: Sequence[int]) -> str:
     ]
     if missing:
         lines += ["", "这些组合没有计划里的时长，要用就得改镜长：" + "；".join(missing) + "。"]
-    lines.append("订阅套餐也按这个价格折算扣用量；这里只列价格。")
+    if not images:
+        lines += ["", "上面没算输入图费；每段要带首帧和参考图时，加 `--images <每段张数>` 重算。"]
+    lines += ["", input_fee_note(), "订阅套餐也按这个价格折算扣用量；这里只列价格。"]
     return "\n".join(lines)
 
 
@@ -2191,15 +2280,16 @@ def quote_jobs(job_files: Sequence[Path], *, model: str | None, config_path: Pat
         parameters = job.get("parameters") if isinstance(job.get("parameters"), Mapping) else {}
         resolution = str(parameters.get("resolution", ""))
         duration = parameters.get("duration")
-        price = minimax_video_price(chosen, resolution, duration)
+        price, note = minimax_job_price(chosen, job)
         total += price
         seconds += duration
         counted += 1
-        lines.append(f"| {job_id} | {chosen} | {resolution} | {duration} 秒 | {_yuan(price)} |")
+        shown = _yuan(price) + (f"（{note}）" if note else "")
+        lines.append(f"| {job_id} | {chosen} | {resolution} | {duration} 秒 | {shown} |")
     lines += [
         "",
         f"合计 {counted} 段视频、{seconds} 秒，按官方价约 {_yuan(round(total, 2))}"
-        "（订阅套餐按这个价格折算扣用量）。",
+        "（含 H3 系列输入图费；订阅套餐按这个价格折算扣用量）。",
     ]
     return "\n".join(lines)
 
@@ -2424,6 +2514,13 @@ def main() -> int:
         help="price a planned set of clips (one length per clip) on every model and resolution",
     )
     parser.add_argument(
+        "--images",
+        type=int,
+        default=0,
+        metavar="N",
+        help="with --estimate: images each clip sends (first frame and references)",
+    )
+    parser.add_argument(
         "--adapter-config",
         type=Path,
         default=ADAPTER_CONFIG_FILE,
@@ -2465,7 +2562,7 @@ def main() -> int:
             if args.price_table:
                 print(price_table())
             if args.estimate:
-                print(estimate_table(args.estimate))
+                print(estimate_table(args.estimate, images=args.images))
             if args.quote:
                 print(quote_jobs(args.quote, model=args.model, config_path=args.adapter_config))
         except (OSError, ValueError, json.JSONDecodeError) as exc:

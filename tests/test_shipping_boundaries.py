@@ -19,6 +19,8 @@ ALLOWED_PROVIDER_URLS = {
         "https://api.minimaxi.com",
         "https://api.minimax.io",
         "https://platform.minimax.cn/docs/guides/pricing-paygo",
+        # Where the H3-series input-material fees are published.
+        "https://platform.minimax.cn/docs/pricing/overview",
     },
     "skills/short-drama-produce/references/providers/seedance.md": {
         "https://ark.cn-beijing.volces.com/api/v3",

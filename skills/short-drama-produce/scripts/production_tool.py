@@ -1352,13 +1352,10 @@ def _price_line(job: Mapping[str, Any]) -> str:
         model = adapters._profile_models(adapters.ADAPTER_CONFIG_FILE).get(str(job["adapter"]))
         if model is None:
             return "不是内置 MiniMax 视频模型，本工具不估算"
-        parameters = job["parameters"]
-        price = adapters.minimax_video_price(
-            model, str(parameters.get("resolution", "")), parameters.get("duration")
-        )
+        price, note = adapters.minimax_job_price(model, job)
     except (ImportError, OSError, ValueError, AttributeError, SyntaxError):
         return "未能估算，请看对话里的报价"
-    return f"{model} 官方价 {price:.2f} 元"
+    return f"{model} 官方价 {price:.2f} 元" + (f"（{note}）" if note else "")
 
 
 def _dialog_message(job: Mapping[str, Any]) -> str:

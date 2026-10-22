@@ -427,6 +427,42 @@ class PriceTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 provider_adapters.estimate_table(bad)
 
+    def test_h3_series_input_images_past_the_free_allowance_are_charged(self) -> None:
+        fee = provider_adapters.minimax_image_fee
+        self.assertEqual(fee("MiniMax-H3", 5), 0.0)
+        self.assertEqual(fee("MiniMax-H3", 7), 0.40)
+        self.assertEqual(fee("MiniMax-H3-Max", 2), 0.0)
+        self.assertEqual(fee("MiniMax-H3-Max", 4), 1.00)
+        self.assertEqual(fee("MiniMax-Hailuo-2.3-Fast", 9), 0.0)
+
+        def job(*roles: str) -> dict:
+            return {
+                "parameters": {"duration": 5, "resolution": "768P"},
+                "reference_bindings": [{"role": role} for role in roles],
+            }
+
+        four = job("first_frame", "reference_image", "reference_image", "reference_image")
+        self.assertEqual(provider_adapters.minimax_job_price("MiniMax-H3-Max", four)[0], 3.50)
+        self.assertIn("2 张 1.00 元", provider_adapters.minimax_job_price("MiniMax-H3-Max", four)[1])
+        self.assertEqual(provider_adapters.minimax_job_price("MiniMax-H3", four), (2.50, ""))
+        audio = job("first_frame", "reference_audio", "reference_audio")
+        self.assertEqual(provider_adapters.minimax_job_price("MiniMax-H3-Max", audio), (2.50, ""))
+        video_price, video_note = provider_adapters.minimax_job_price(
+            "MiniMax-H3", job("reference_video", "reference_image")
+        )
+        self.assertEqual(video_price, 2.50)
+        self.assertIn("参考视频", video_note)
+        plain = {"parameters": {"duration": 6, "resolution": "768P"}, "references": ["a.png", "b.jpg", "c.png"]}
+        self.assertEqual(provider_adapters.minimax_job_price("MiniMax-H3-Max", plain)[0], 3.50)
+
+        with_images = provider_adapters.estimate_table([5, 5], images=4)
+        self.assertIn("每段带 4 张输入图", with_images)
+        self.assertIn("| MiniMax-H3-Max | `minimax-h3-max` | 768P | 7.00 元 |", with_images)
+        self.assertIn("| MiniMax-H3 | `minimax-h3` | 768P | 5.00 元 |", with_images)
+        self.assertIn("--images", provider_adapters.estimate_table([5]))
+        with isolated():
+            self.assertIn("超出每张 0.50 元", provider_adapters.price_table())
+
     def test_quote_prices_each_job_by_profile_or_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
