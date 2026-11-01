@@ -18,6 +18,7 @@ license: MIT
 
 | 用户要做什么 | owner / 行为 |
 |---|---|
+| 贴来抖音/快手/小红书视频链接要复刻、仿同款、拆解为什么火 | `$short-drama-remake`：下载、拉片、拆解、定复刻方案，再交回下列各技能 |
 | 开发点子、系列承诺、改编和分集地图 | `$short-drama-develop`，仅在用户需要时 |
 | 已有多集完整剧本/散稿识别分集 | `$short-drama-develop` 按实际边界建立临时索引 |
 | 分析长篇原著 | `$short-drama-novel-analyze`，仅在用户需要时 |

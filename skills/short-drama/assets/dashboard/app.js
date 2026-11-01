@@ -47,7 +47,7 @@ const SECTION_ORDER = ["story", "project", "sources", "analysis", "cast", "visua
 
 const CONTENT_META = {
   sources: { label: "原始资料" },
-  analysis: { label: "原著分析" },
+  analysis: { label: "原著与爆款拆解" },
   project: { label: "项目设定" },
   cast: { label: "人物场景" },
   story: { label: "故事与剧本" },
@@ -72,6 +72,7 @@ const OWNER_SECTIONS = {
   "short-drama-video-prompts": "prompts",
   "short-drama-produce": "production",
   "short-drama-edit": "production",
+  "short-drama-remake": "analysis",
 };
 
 // Mirrors project_tool.py's EPISODE_ID_RE.
@@ -210,7 +211,7 @@ function creatorSection(path, ownership = null) {
     return ownerSection(path, ownership) || "other";
   }
   const root = ROOT_ROLES[first] || ROOT_ROLES[lowerFirst];
-  if (parts[1] === "source-analysis") return "analysis";
+  if (parts[1] === "source-analysis" || parts[1] === "remake") return "analysis";
   if (root === "sources" || root === "project") return root;
   if (root === "bible") return "cast";
   if (root !== "episodes") return ownerSection(path, ownership) || "other";

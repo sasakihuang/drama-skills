@@ -7,7 +7,7 @@
 <h1 align="center">Drama Skills</h1>
 
 <p align="center">
-  <b>An AI short-drama creation workflow for screenwriters, motion-comic studios, and directors: eleven skills that take an idea or a source novel to episode scripts, storyboards, image/video prompts, and a finished cut.</b>
+  <b>An AI short-drama creation workflow for screenwriters, motion-comic studios, and directors: twelve skills that take a viral reference video, an idea or a source novel to episode scripts, storyboards, image/video prompts, and a finished cut.</b>
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 <p align="center">
   <a href="https://github.com/zenstory-ai/drama-skills/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/zenstory-ai/drama-skills?style=flat-square&color=22D3EE&logo=github&logoColor=white&label=Stars"></a>
   <a href="https://github.com/zenstory-ai/drama-skills/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zenstory-ai/drama-skills?style=flat-square&color=081431&label=Release"></a>
-  <img alt="Skills 11" src="https://img.shields.io/badge/Skills-11-081431?style=flat-square">
+  <img alt="Skills 12" src="https://img.shields.io/badge/Skills-12-081431?style=flat-square">
   <a href="https://www.python.org/"><img alt="Python 3.9%2B" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white"></a>
   <a href="https://github.com/zenstory-ai/drama-skills/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/zenstory-ai/drama-skills/ci.yml?style=flat-square&label=CI"></a>
   <a href="./LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-1F6FEB?style=flat-square"></a>
@@ -256,7 +256,7 @@ ERROR: SHOT-EP001-003: 分镜时长 2 秒与视频提示词 3 秒不一致；视
 The first line: the frozen keyframe names the character "Zhou Bosen" but the visual basis does not cover him; if he is
 genuinely not visible, declare him off-screen. The second: the storyboard says 2 seconds and the video prompt says 3.
 
-## The eleven skills
+## The twelve skills
 
 Use the stages your request needs: a text handoff can stop at its target stage, review can cover any existing artifact, and static motion comics move from keyframes and voices to production and editing.
 
@@ -299,6 +299,7 @@ flowchart LR
 | `short-drama-produce` | Preview a bounded image/video/TTS/music job, require explicit confirmation, execute an external adapter, and record results; optional Seedance, GPT Image 2, MiniMax H3 video, and MiniMax Music profiles are included |
 | `short-drama-edit` | Usable band per generated clip, in/out points and shot order, dialogue integrity, subtitles and loudness; written as a cut list and rendered into a film |
 | `short-drama-review` | Structural/content review, project-bounded diagnosis from authorized production observations, and revision verdicts |
+| `short-drama-remake` | Viral remake: fetch a Douyin/Kuaishou/Xiaohongshu reference, measure its shots, explain why it works, agree a remake plan (moderate or bold), hand it to the other skills, and compare the new cut with the reference. Chart, candlestick and text explainers take a motion-graphics route built locally with HyperFrames, with a voice audition before narration and a measured sound-and-motion comparison against the reference. Structure and pacing only; no lines, footage, people, brands, voices or music are carried over |
 
 ## Local creator workspace
 

@@ -11,6 +11,14 @@ SUITE = Path(__file__).resolve().parents[1]
 SHIPPED_SKILLS = SUITE / "skills"
 DASHBOARD_SERVER = SHIPPED_SKILLS / "short-drama/scripts/dashboard_server.py"
 PROVIDER_ADAPTER = SHIPPED_SKILLS / "short-drama-produce/scripts/provider_adapters.py"
+# The remake skill's one fetcher: it opens a share link the creator pasted and
+# saves that single reference video. It is the only other script allowed to
+# reach the network, and it never posts, logs in or handles credentials.
+REMAKE_FETCHER = SHIPPED_SKILLS / "short-drama-remake/scripts/fetch_reference.py"
+# The remake skill's music fetcher downloads one track, by id, from the checked Mixkit
+# catalog the skill ships; it never uploads, logs in or handles credentials.
+REMAKE_MUSIC = SHIPPED_SKILLS / "short-drama-remake/scripts/fetch_music.py"
+OUTBOUND_SCRIPTS = {PROVIDER_ADAPTER, REMAKE_FETCHER, REMAKE_MUSIC}
 ALLOWED_PROVIDER_URLS = {
     "skills/short-drama-produce/scripts/provider_adapters.py": {
         "https://api.openai.com/v1",
@@ -57,6 +65,22 @@ ALLOWED_PROVIDER_URLS = {
     # this suite calls.
     "skills/short-drama-edit/assets/remotion/README.md": {
         "https://github.com/remotion-dev/remotion/blob/main/LICENSE.md",
+    },
+    # The share pages and media host the remake fetcher reads one reference
+    # video from, and the model mirror the optional transcription setup names.
+    "skills/short-drama-remake/scripts/fetch_reference.py": {
+        "https://www.douyin.com",
+        "https://www.xiaohongshu.com",
+        "https://sns-video-bd.xhscdn.com",
+    },
+    "skills/short-drama-remake/SKILL.md": {
+        "https://hf-mirror.com",
+    },
+    # The music host the fetcher downloads one catalogued track from, and the licence
+    # it records in the delivery notes.
+    "skills/short-drama-remake/scripts/fetch_music.py": {
+        "https://assets.mixkit.co/music/",
+        "https://mixkit.co/license/#musicFree",
     },
     "skills/short-drama-video-prompts/references/minimax-h3.md": {
         "https://github.com/MiniMax-AI/MiniMax-H3/blob/main/skills/h3-prompt-writing/references/base-en.txt",
@@ -319,14 +343,14 @@ class ShippingBoundaryTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             if forbidden_imports.search(text):
                 outbound_scripts.add(path)
-                if path != PROVIDER_ADAPTER:
+                if path not in OUTBOUND_SCRIPTS:
                     findings.append(f"{path.relative_to(SUITE)}: outbound/private import")
             if runtime_lookup.search(text) and path != PROVIDER_ADAPTER:
                 findings.append(f"{path.relative_to(SUITE)}: runtime source lookup")
         self.assertEqual(
             outbound_scripts,
-            {PROVIDER_ADAPTER},
-            "only the explicit production provider adapter may import an outbound client",
+            OUTBOUND_SCRIPTS,
+            "only the production provider adapter and the remake fetchers may import an outbound client",
         )
         self.assertEqual(
             findings, [], "runtime boundary violations:\n" + "\n".join(findings)

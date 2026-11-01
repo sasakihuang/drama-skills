@@ -1,0 +1,4 @@
+interface:
+  display_name: "爆款复刻"
+  short_description: "丢一条抖音、快手或小红书视频链接，拆清楚它为什么火，再照同样的结构做一条内容全新的视频"
+  default_prompt: "使用 $short-drama-remake 复刻这条视频："

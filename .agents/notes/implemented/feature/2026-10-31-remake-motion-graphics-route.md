@@ -1,0 +1,65 @@
+# Agent Note: 爆款复刻加图文动效路线和声音、画面实测
+
+Status: implemented
+
+日期：2026-10-31
+
+## Problem
+
+复刻技能第一次在 Codex 里实跑，原片是一条 K 线讲解（黑底、红青 K 线、毛笔大字、全程垫配乐）。
+交接表只通向 AI 出图、出视频的短剧流程，图文类原片没有做动画的路。助手只好用 mplfinance 和 PIL
+逐帧拼图，成片 99.6% 的时间画面不动，最长 12.9 秒没变化，十段套同一个后台报表版式。
+拆解阶段没跑台词识别，也没量声音，配音是盲选的：用了 MiniMax 的新闻播报女声，十段之间空
+1 到 3 秒，还用 atempo 放慢到 0.9 倍去凑原片切点，没有配乐。新片 -16.5 LUFS，原片 -9.4 LUFS，
+原片声音几乎不断。文案句句打折扣，原片那种干货口气没了。创作者的评价是别扭、动效 low、
+配音像机器人。
+
+## Decision
+
+- 拆解时判片型。图文动效类走新的 `references/motion-graphics-route.md`：用 HyperFrames
+  （heygen-com/hyperframes，Apache-2.0，钉 0.8.181）在本机做动画，明令不准用静态图库逐帧拼图。
+  附 `assets/kline-starter/`：K 线生长、镜头推近、发光圈、大字标注、划线、标题冲击、火星，
+  渲染工具、GSAP 3.14.2、两款 OFL 字体都写进 `package.json`，装在项目目录，渲染不连外网。
+  HyperFrames 的匿名统计用 `HYPERFRAMES_NO_TELEMETRY=1` 关掉。
+- 新增 `scripts/media_profile.py`（标准库加 ffmpeg）：量响度、停顿、配乐（停顿极少即判有垫底）、
+  画面最长不动（freezedetect）、有识别结果时的语速；`--compare` 拿成片对原片逐项判。用翻车成片
+  实测：它报出 6 项不通过，原片全部达标。
+- 声音：画面跟着配音走，不把配音塞进原片切点；配全片前先出三四个音色试听（用账号的
+  get_voice 列表核过编号），播音腔不进默认候选；快慢只用 `speed` 参数调，后期 atempo 不小于 1；
+  配乐来源依次是创作者自有授权、登录 HeyGen 曲库、都没有就只加音效并先告知；
+  音效用 HyperFrames 包里自带的 Pixabay 音效。混音命令（sidechaincompress 压配乐、loudnorm）实测过。
+- 文案：字数按原片实测语速算，口气照原片，风险提示只在片尾说一次。
+- 复刻尺度的声音一行补「播音腔不算同语气」「原片垫配乐新片也垫」，加「口气」一行；成片对照检查加
+  画面不僵、声音接得上、口气对上三项。
+
+## Alternatives considered
+
+- HyperFrames 的 `reverse-any-video`：要 HeyGen 付费版，而且是逐帧照抄原片，违反只学结构的规矩。
+- Remotion：公司超过 3 人商用要买授权；套件里只在剪辑字幕叠层可选使用。
+- 继续交给 `$short-drama-produce` 出视频：AI 视频画不准 K 线和数字，贵，还要每镜报价。
+- 让 HyperFrames 的技能装进 Codex：`skills` 命令会改全局技能目录，改为直接读
+  `node_modules/hyperframes/dist/skills/hyperframes/SKILL.md` 和 `hyperframes docs`。
+- MiniMax 音乐：2026-08-20 起不对新账号开放。
+
+## Consequences
+
+- 图文动效类要 Node 22 以上，项目里第一次 `npm install` 约 100 MB，渲染用的 Chrome 另下。
+- `media_profile.py` 的「垫了配乐」只看停顿多少，人声极密的纯口播也可能被判为有垫底；它只是给创作者看的
+  手艺检查，不是发布门槛。
+- 本次只改技能，没有在 Codex 里重跑；下一步由用户在 Codex 实测。全套测试 766 项，失败 16 项，
+  和 10-29 记录的 Windows 老失败数目一致，都在没改动的剪辑、导出、看板模块；ruff 0.15.11 全过。
+
+## Follow-up 2026-11-01: 配乐改用 Mixkit
+
+- 实测国内真直连（绑实体网卡、不走代理）：HeyGen 的官网、app、api 都在 TLS 握手时被重置，原先的「登录 HeyGen
+  取曲库」在没有代理的电脑上用不了。用户第二次实跑时用的就是 HeyGen 曲库，靠的是本机代理。
+- 比过的来源：Mixkit 直连 1 到 2 秒能下，免费商用、不用署名，选它；Incompetech 要署名；FMA 每首许可不同；
+  FreePD 已关站；Pixabay、Chosic、爱给网对脚本回 403；剪映曲库要看画面挑，多数是会员歌，用户定为不进流程。
+- `references/music-catalog.json`：32 首，8 种情绪，每首都下载并量过响度和开头静音。只收录许可为
+  Mixkit Stock Music Free License 的；Mixkit 条款不宜原样再分发，所以不打包音频，用时按编号现下。
+- `scripts/fetch_music.py`：`list` 看清单；`fetch` 下载（3 次重试、带浏览器 UA，否则 403），按
+  `--voice` 实测响度把配乐定在旁白下 13 LU，`--length` 时生成 `配乐垫底.wav`（去掉开头静音和结尾
+  -35 dB 以下的淡出尾巴，1.5 秒交叉淡化循环，淡入 0.5 秒、淡出 1.5 秒），另写 `配乐来源.md`。
+  清单外编号一律拒绝。测试白名单登记了它的两个网址。
+- 实测：18 秒和 260 秒两种长度都出过垫底，长的拼了 3 到 5 遍，接缝没有空档；和旁白、音效混音后
+  -13.4 LUFS，真峰值 -1.5，`continuous_bed` 为真。全套测试仍是原来那 16 个 Windows 老失败。

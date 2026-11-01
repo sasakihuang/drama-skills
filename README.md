@@ -5,7 +5,7 @@
 <h1 align="center">Drama Skills</h1>
 
 <p align="center">
-  <b>面向编剧、漫剧工作室和编导的 AI 短剧创作工作流：十一个技能，从一个点子或一部原著做到分集剧本、分镜、图片/视频提示词和成片。</b>
+  <b>丢一条爆款视频链接，拆清楚它为什么火，再照同样的结构做一条内容全新的视频；也能从一个点子或一部原著做到分集剧本、分镜、图片/视频提示词和成片。十二个技能。</b>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 <p align="center">
   <a href="https://github.com/zenstory-ai/drama-skills/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/zenstory-ai/drama-skills?style=flat-square&color=22D3EE&logo=github&logoColor=white&label=Stars"></a>
   <a href="https://github.com/zenstory-ai/drama-skills/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zenstory-ai/drama-skills?style=flat-square&color=081431&label=Release"></a>
-  <img alt="Skills 11" src="https://img.shields.io/badge/Skills-11-081431?style=flat-square">
+  <img alt="Skills 12" src="https://img.shields.io/badge/Skills-12-081431?style=flat-square">
   <a href="https://www.python.org/"><img alt="Python 3.9%2B" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white"></a>
   <a href="https://github.com/zenstory-ai/drama-skills/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/zenstory-ai/drama-skills/ci.yml?style=flat-square&label=CI"></a>
   <a href="./LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/License-MIT-1F6FEB?style=flat-square"></a>
@@ -30,6 +30,36 @@
 <p align="center">
   <a href="https://t.me/+CZmsmvWIhb4zZTNl"><img alt="Telegram 交流群" src="https://img.shields.io/badge/Telegram%20%E4%BA%A4%E6%B5%81%E7%BE%A4-26A5E4?style=for-the-badge&logo=telegram&logoColor=white"></a>
 </p>
+
+## 爆款复刻：这个分支现在主要做这件事
+
+丢给 Codex 一条抖音、快手或小红书视频的分享链接，它会：
+
+1. **下载原片**：快手、小红书直接取；抖音用 Codex 自带的浏览器取；都不行就让你在 App 里保存视频后交给它。
+2. **拆解为什么火**：程序量出每个镜头多长、在哪切，AI 看画面判断景别、运镜和每一镜留住观众的作用，写出一份拆解报告：钩子怎么下、段落怎么排、节奏多快、哪些能学、哪些必须换、能仿几成。
+3. **停下来问你**：照推荐的新题材和尺度走、换一个题材或尺度，或者直接说出你自己的想法让它改，改到你满意为止。
+4. **照同样的结构做一条新片**：
+   - 剧情、实拍类：剧本、分镜、提示词、出图出视频、剪辑都交给下面那套短剧技能。
+   - K 线、图表、文字讲解类：配音前先给你听三四个音色的试听，你挑定了再配全片；动画在本机用
+     HyperFrames 做（K 线一根根长出来、镜头推近、大字标注、转场音效），垫上配乐。
+   - 每批生成前都先报价，你点头才花钱。
+5. **和原片对照检查**：程序量一遍画面有没有长时间不动、有没有冷场、配乐和音量够不够、语速拖不拖；
+   再对照节奏像不像、有没有照搬原片的东西。
+
+在 Codex 里这样说就行：
+
+```text
+使用 $short-drama-remake 复刻这条视频：<把 App 里「分享 → 复制链接」得到的整段文字贴在这里>
+```
+
+只学结构和节奏，原片的台词、画面、人物、品牌、配音、音乐一律不进新片。照搬会侵权，平台也会按搬运处理。
+提供「中度」和「大胆」两档，没有「原样照搬」这一档。
+
+需要 Python 3.9 或更新版本、`ffmpeg`、`node` 18 或更新版本；做 K 线、图表这类图文动效片要 `node` 22
+或更新版本，第一次用会在项目里装一次 HyperFrames（Apache-2.0，大约 100 MB）。识别台词是可选的，
+第一次用会问你要不要装。
+拉片工具来自 eternityspring/reelbench-skills（Apache-2.0），随技能附带；借鉴的其他项目列在
+`skills/short-drama-remake/references/credits.md`。
 
 ## 这个分支改了什么
 
@@ -255,7 +285,7 @@ ERROR: SHOT-EP001-002: 冻结关键帧提示词写到人物「周薄森」，视
 ERROR: SHOT-EP001-003: 分镜时长 2 秒与视频提示词 3 秒不一致；视频提示词只能原样照抄已接受的镜头时长
 ```
 
-## 十一个技能
+## 十二个技能
 
 各阶段按请求调用：文本交付在所需阶段完成，审查可针对任一已有产物；静态漫剧从关键帧与配音进入生产和剪辑。
 
@@ -264,6 +294,7 @@ flowchart LR
     classDef phase fill:#e8f4fd,color:#1a1a2e,stroke:#4a9be8,stroke-width:1px
     classDef final fill:#fce4ec,color:#333,stroke:#e57373,stroke-width:1px
 
+    rmk["爆款复刻<br/>$short-drama-remake"]:::phase
     nva["原著分析<br/>$short-drama-novel-analyze"]:::phase
     dev["故事开发<br/>$short-drama-develop"]:::phase
     write["分集剧本<br/>$short-drama-write"]:::phase
@@ -276,6 +307,7 @@ flowchart LR
     rev["审查<br/>$short-drama-review"]:::final
     pkg["文本交付包"]:::final
 
+    rmk -.复刻方案.-> write
     nva -.有原著时.-> dev
     dev -.可选.-> write --> assets
     assets --> img
@@ -287,6 +319,7 @@ flowchart LR
 
 | 技能 | 职责 |
 |---|---|
+| `short-drama-remake` | 爆款复刻：下载抖音/快手/小红书参考片、实测拉片、拆解为什么火、定复刻方案（中度/大胆），交给后续技能做新片并与原片对照 |
 | `short-drama` | 初始化、路由、视觉方向/Look Development 与 Dashboard |
 | `short-drama-novel-analyze` | 长篇原著的抽样改编快评、章节索引、逐章功能提取、剧情单元与节奏、改编价值与分集候选 |
 | `short-drama-develop` | 小说/长材料的可追溯改编、多集整稿的 Agent 主导切片与续跑、故事引擎、分集地图、导演阐述、题材与钩子手册 |
