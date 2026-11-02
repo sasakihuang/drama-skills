@@ -63,3 +63,14 @@ Status: implemented
   清单外编号一律拒绝。测试白名单登记了它的两个网址。
 - 实测：18 秒和 260 秒两种长度都出过垫底，长的拼了 3 到 5 遍，接缝没有空档；和旁白、音效混音后
   -13.4 LUFS，真峰值 -1.5，`continuous_bed` 为真。全套测试仍是原来那 16 个 Windows 老失败。
+
+## Follow-up 2026-11-02: 方案网页预览
+
+- 用户看不惯 Markdown 排版，要求复刻方案出 HTML 预览。先试了在 Codex 内置浏览器里自动打开：内置浏览器只认
+  http/https（file:// 被 URL 策略拒绝），用 Start-Process 起的后台预览服务被安全策略拦下；官方 sites 技能的做法
+  是常驻会话里起服务、再 open_in_codex。用户随后定：不必强制打开，给链接让他自己点即可，所以没有做服务。
+- `scripts/plan_preview.py`（标准库）：把 `复刻方案.md` 和 `拆解报告.md` 排成一页 `复刻方案预览.html`，放在参考片
+  目录：左侧目录、顶部关键数字、要点列表做成卡片、「对照」表格做成时间条和段落卡片并配 `frames/<镜号>a.jpg`、
+  代码块折叠、大字和打印按钮。Markdown 只覆盖本技能文档用到的写法，不为此引第三方解析库。
+- 交付成片时写文件夹路径并用 `Start-Process explorer.exe -ArgumentList ('/select,"' + $video + '"')` 打开；
+  PowerShell 直接写 `explorer.exe /select,"$video"` 会转义坏引号、打开「文档」。

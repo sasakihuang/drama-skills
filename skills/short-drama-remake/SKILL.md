@@ -81,6 +81,22 @@ python3 <本技能目录>/scripts/media_profile.py <参考片目录>/source.mp4
 照 [复刻尺度](references/remake-policy.md) 和报告模板写 `复刻方案.md` 初稿：推荐一个新题材和尺度，
 写出段落一级的逐镜对照和节奏档案提议。
 
+**停下之前先出网页预览。** 创作者看 Markdown 原文很吃力，方案要给他排好版的网页：
+
+```bash
+python3 <本技能目录>/scripts/plan_preview.py <参考片目录>
+```
+
+它把 `复刻方案.md` 和 `拆解报告.md` 排成一页 `复刻方案预览.html`，放在参考片目录里：左边是目录，段落对照
+做成卡片，每段配原片对应镜头的截图（取自同目录的 `frames/`），长的技术参数折叠起来。用任何浏览器都能直接打开，
+不用联网。
+
+- 消息里写一个 Markdown 链接指向这个网页，链接目标用脚本输出里 `link` 那一项的完整路径（用正斜杠的绝对路径），
+  创作者自己点开看。不必替他打开。
+- 方案以 Markdown 为准，网页只是给人看的。按创作者的话改方案时只改 `复刻方案.md`，改完重新运行一次上面的命令，
+  再把链接发给他。
+- 网页预览只用在这一步。后面的试听选声、定配乐和交付照原来的做法，不另外做网页。
+
 **停下。** 先用三五句话讲清它为什么火、能仿几成，再用选项卡给创作者三条路：
 照推荐的走 / 换题材或换尺度 / 说出自己的想法让你改。选第三条就照他的话改方案，逐条讲改了什么，
 再问一次，可以来回改很多轮，**他说满意之前不往下走**。做法见报告模板最后一节。
@@ -171,4 +187,5 @@ python3 -m venv ~/.drama-skills/asr-venv
   [免费配乐清单](references/music-catalog.json) 和配乐脚本 [fetch_music.py](scripts/fetch_music.py)
 - [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md)
 - [拉片工具使用说明](vendor/video-shots/guide.md)：随技能附带，来源见同目录 `ATTRIBUTION.md`
+- [方案网页预览脚本](scripts/plan_preview.py)：把复刻方案和拆解报告排成一页网页
 - [借鉴来源](references/credits.md)
