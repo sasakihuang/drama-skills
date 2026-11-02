@@ -1,0 +1,528 @@
+{
+ "source": "MiniMax 系统音色（get_voice），2026-11-02 从国内站账号读出的 58 个中文音色",
+ "note": "fit：讲解 = 适合讲解类旁白，默认只从这类挑；角色 = 角色感强，剧情片或创作者点名才用；播音 = 播音腔，原片是播报才用；童声卡通 = 创作者点名才用。tone 是按官方描述或名字写的大致劲头，最终以试听为准。带「精品版」的是同名音色的另一个版本。",
+ "voices": [
+  {
+   "id": "male-qn-jingying",
+   "name": "精英青年",
+   "gender": "男",
+   "age": "青年",
+   "tone": "干脆利落、自信",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "male-qn-jingying-jingpin",
+   "name": "精英青年（精品版）",
+   "gender": "男",
+   "age": "青年",
+   "tone": "干脆利落、自信",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Reliable_Executive",
+   "name": "沉稳高管",
+   "gender": "男",
+   "age": "中年",
+   "tone": "沉稳可靠、有分量",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Sincere_Adult",
+   "name": "真诚青年",
+   "gender": "男",
+   "age": "青年",
+   "tone": "真诚、带鼓励",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Gentleman",
+   "name": "温润男声",
+   "gender": "男",
+   "age": "青年",
+   "tone": "温润、有磁性",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Gentle_Youth",
+   "name": "温润青年",
+   "gender": "男",
+   "age": "青年",
+   "tone": "温柔、平和",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Radio_Host",
+   "name": "电台男主播",
+   "gender": "男",
+   "age": "青年",
+   "tone": "流畅、有感染力",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Lyrical_Voice",
+   "name": "抒情男声",
+   "gender": "男",
+   "age": "青年",
+   "tone": "磁性、有表现力",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Unrestrained_Young_Man",
+   "name": "不羁青年",
+   "gender": "男",
+   "age": "青年",
+   "tone": "潇洒、带情绪",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "male-qn-daxuesheng",
+   "name": "青年大学生",
+   "gender": "男",
+   "age": "青年",
+   "tone": "朝气、口语化",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "male-qn-daxuesheng-jingpin",
+   "name": "青年大学生（精品版）",
+   "gender": "男",
+   "age": "青年",
+   "tone": "朝气、口语化",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "male-qn-qingse",
+   "name": "青涩青年",
+   "gender": "男",
+   "age": "青年",
+   "tone": "青涩、清爽",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "male-qn-qingse-jingpin",
+   "name": "青涩青年（精品版）",
+   "gender": "男",
+   "age": "青年",
+   "tone": "青涩、清爽",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Straightforward_Boy",
+   "name": "率真弟弟",
+   "gender": "男",
+   "age": "少年",
+   "tone": "认真、率真",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Pure-hearted_Boy",
+   "name": "清澈邻家弟弟",
+   "gender": "男",
+   "age": "少年",
+   "tone": "清澈、认真",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Southern_Young_Man",
+   "name": "南方小哥",
+   "gender": "男",
+   "age": "青年",
+   "tone": "质朴、接地气",
+   "fit": "讲解",
+   "accent": "南方口音"
+  },
+  {
+   "id": "Chinese (Mandarin)_Humorous_Elder",
+   "name": "搞笑大爷",
+   "gender": "男",
+   "age": "老年",
+   "tone": "爽朗、幽默",
+   "fit": "讲解",
+   "accent": "北方口音"
+  },
+  {
+   "id": "male-qn-badao",
+   "name": "霸道青年",
+   "gender": "男",
+   "age": "青年",
+   "tone": "强势、压迫感",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "male-qn-badao-jingpin",
+   "name": "霸道青年（精品版）",
+   "gender": "男",
+   "age": "青年",
+   "tone": "强势、压迫感",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "lengdan_xiongzhang",
+   "name": "冷淡学长",
+   "gender": "男",
+   "age": "青年",
+   "tone": "冷淡、克制",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "junlang_nanyou",
+   "name": "俊朗男友",
+   "gender": "男",
+   "age": "青年",
+   "tone": "温柔、恋爱感",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "chunzhen_xuedi",
+   "name": "纯真学弟",
+   "gender": "男",
+   "age": "少年",
+   "tone": "单纯、阳光",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Stubborn_Friend",
+   "name": "嘴硬竹马",
+   "gender": "男",
+   "age": "青年",
+   "tone": "嘴硬心软、不羁",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "bingjiao_didi",
+   "name": "病娇弟弟",
+   "gender": "男",
+   "age": "少年",
+   "tone": "病娇、偏执",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "badao_shaoye",
+   "name": "霸道少爷",
+   "gender": "男",
+   "age": "青年",
+   "tone": "傲气、霸道",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "female-yujie",
+   "name": "御姐",
+   "gender": "女",
+   "age": "青年",
+   "tone": "干练、成熟",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-yujie-jingpin",
+   "name": "御姐（精品版）",
+   "gender": "女",
+   "age": "青年",
+   "tone": "干练、成熟",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-chengshu",
+   "name": "成熟女性",
+   "gender": "女",
+   "age": "中年",
+   "tone": "稳重、知性",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-chengshu-jingpin",
+   "name": "成熟女性（精品版）",
+   "gender": "女",
+   "age": "中年",
+   "tone": "稳重、知性",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Wise_Women",
+   "name": "阅历姐姐",
+   "gender": "女",
+   "age": "中年",
+   "tone": "有阅历、抒情",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Warm_Bestie",
+   "name": "温暖闺蜜",
+   "gender": "女",
+   "age": "青年",
+   "tone": "温暖清脆、友好",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Gentle_Senior",
+   "name": "温柔学姐",
+   "gender": "女",
+   "age": "青年",
+   "tone": "温暖温柔",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "danya_xuejie",
+   "name": "淡雅学姐",
+   "gender": "女",
+   "age": "青年",
+   "tone": "淡雅、安静",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Sweet_Lady",
+   "name": "甜美女声",
+   "gender": "女",
+   "age": "青年",
+   "tone": "温柔甜美",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-tianmei",
+   "name": "甜美女性",
+   "gender": "女",
+   "age": "青年",
+   "tone": "甜美、亲切",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-tianmei-jingpin",
+   "name": "甜美女性（精品版）",
+   "gender": "女",
+   "age": "青年",
+   "tone": "甜美、亲切",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Kind-hearted_Antie",
+   "name": "热心大婶",
+   "gender": "女",
+   "age": "中年",
+   "tone": "温和、热心",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Kind-hearted_Elder",
+   "name": "花甲奶奶",
+   "gender": "女",
+   "age": "老年",
+   "tone": "慈祥、和蔼",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Warm_Girl",
+   "name": "温暖少女",
+   "gender": "女",
+   "age": "少年",
+   "tone": "温柔温暖",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Crisp_Girl",
+   "name": "清脆少女",
+   "gender": "女",
+   "age": "少年",
+   "tone": "清脆、温暖",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-shaonv",
+   "name": "少女",
+   "gender": "女",
+   "age": "少年",
+   "tone": "清亮、活泼",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "female-shaonv-jingpin",
+   "name": "少女（精品版）",
+   "gender": "女",
+   "age": "少年",
+   "tone": "清亮、活泼",
+   "fit": "讲解",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Soft_Girl",
+   "name": "软软女孩",
+   "gender": "女",
+   "age": "青年",
+   "tone": "温暖柔软",
+   "fit": "讲解",
+   "accent": "南方口音"
+  },
+  {
+   "id": "Chinese (Mandarin)_HK_Flight_Attendant",
+   "name": "港普空姐",
+   "gender": "女",
+   "age": "中年",
+   "tone": "礼貌、清晰",
+   "fit": "讲解",
+   "accent": "港式普通话"
+  },
+  {
+   "id": "Chinese (Mandarin)_Mature_Woman",
+   "name": "傲娇御姐",
+   "gender": "女",
+   "age": "青年",
+   "tone": "妩媚、成熟",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "Arrogant_Miss",
+   "name": "嚣张小姐",
+   "gender": "女",
+   "age": "青年",
+   "tone": "嚣张、优越感",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "wumei_yujie",
+   "name": "妩媚御姐",
+   "gender": "女",
+   "age": "青年",
+   "tone": "妩媚",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "diadia_xuemei",
+   "name": "嗲嗲学妹",
+   "gender": "女",
+   "age": "少年",
+   "tone": "嗲、撒娇",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "qiaopi_mengmei",
+   "name": "俏皮萌妹",
+   "gender": "女",
+   "age": "少年",
+   "tone": "俏皮、可爱",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "tianxin_xiaoling",
+   "name": "甜心小玲",
+   "gender": "女",
+   "age": "少年",
+   "tone": "甜、软萌",
+   "fit": "角色",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_News_Anchor",
+   "name": "新闻女声",
+   "gender": "女",
+   "age": "中年",
+   "tone": "播音腔、正式",
+   "fit": "播音",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Male_Announcer",
+   "name": "播报男声",
+   "gender": "男",
+   "age": "中年",
+   "tone": "播音腔、权威",
+   "fit": "播音",
+   "accent": "标准"
+  },
+  {
+   "id": "clever_boy",
+   "name": "聪明男童",
+   "gender": "童",
+   "age": "儿童",
+   "tone": "机灵",
+   "fit": "童声卡通",
+   "accent": "标准"
+  },
+  {
+   "id": "cute_boy",
+   "name": "可爱男童",
+   "gender": "童",
+   "age": "儿童",
+   "tone": "可爱",
+   "fit": "童声卡通",
+   "accent": "标准"
+  },
+  {
+   "id": "lovely_girl",
+   "name": "萌萌女童",
+   "gender": "童",
+   "age": "儿童",
+   "tone": "软萌",
+   "fit": "童声卡通",
+   "accent": "标准"
+  },
+  {
+   "id": "cartoon_pig",
+   "name": "卡通猪小琪",
+   "gender": "童",
+   "age": "儿童",
+   "tone": "卡通腔",
+   "fit": "童声卡通",
+   "accent": "标准"
+  },
+  {
+   "id": "Chinese (Mandarin)_Cute_Spirit",
+   "name": "憨憨萌兽",
+   "gender": "男",
+   "age": "少年",
+   "tone": "呆萌、憨厚",
+   "fit": "童声卡通",
+   "accent": "标准"
+  },
+  {
+   "id": "Robot_Armor",
+   "name": "机械战甲",
+   "gender": "男",
+   "age": "青年",
+   "tone": "电子机器人声",
+   "fit": "童声卡通",
+   "accent": "标准"
+  }
+ ]
+}

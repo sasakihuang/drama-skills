@@ -105,7 +105,8 @@ python3 <本技能目录>/scripts/plan_preview.py <参考片目录>
 
 **图文动效类**照 [图文动效路线](references/motion-graphics-route.md) 做：旁白稿仍交给
 `$short-drama-write`，配音走 `$short-drama-produce` 的报价和确认，动画、混音和渲染在 HyperFrames 里做，
-不经过出图、出视频和剪辑那几个技能。第二次停下是**试听选声和定配乐**：先让创作者听三四个候选音色，
+不经过出图、出视频和剪辑那几个技能。第二次停下是**试听选声和定配乐**：创作者存过「我的音色」就先问他用不用；
+不用就从 58 个中文音色里按原片挑四个给他试听，听中的可以存起来以后复用。然后让他
 再听两首候选配乐（从技能附带的 Mixkit 免费曲库里按情绪挑，`scripts/fetch_music.py` 负责下载和定音量），
 选定了才配全片。
 
@@ -188,4 +189,5 @@ python3 -m venv ~/.drama-skills/asr-venv
 - [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md)
 - [拉片工具使用说明](vendor/video-shots/guide.md)：随技能附带，来源见同目录 `ATTRIBUTION.md`
 - [方案网页预览脚本](scripts/plan_preview.py)：把复刻方案和拆解报告排成一页网页
+- [中文音色清单](references/voice-catalog.json) 和 [我的音色脚本](scripts/my_voices.py)：试听挑候选、存下听中的音色以后复用
 - [借鉴来源](references/credits.md)
