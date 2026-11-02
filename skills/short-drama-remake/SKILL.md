@@ -114,6 +114,20 @@ python3 <本技能目录>/scripts/media_profile.py <成片.mp4> --compare <参�
 把新片和原片并排对一遍，写进 `复刻方案.md` 最后一节，和成片一起交给创作者，附一句「这条照原片学了
 哪几招」。不通过的项，只把那一段交回负责的技能重做。
 
+**交付成片时，一定让创作者能直接找到文件夹**（草稿版和正式版都照做）：
+
+1. 消息里单独一行，用代码块写出成片所在**文件夹**的完整路径。Windows 用反斜杠，方便他复制到资源管理器的地址栏。
+2. 再给一个指向这个文件夹的链接。链接要指向文件夹，不是视频文件；视频和字幕的链接放在它后面。
+3. 直接替他打开文件夹并选中成片。Windows 在 PowerShell 里这样写：
+
+```powershell
+$video = '<成片的完整路径，用反斜杠>'
+Start-Process explorer.exe -ArgumentList ('/select,"' + $video + '"')
+```
+
+   不要写成 `explorer.exe /select,"$video"`。PowerShell 会把引号转义坏，结果打开的是「文档」文件夹。
+   macOS 用 `open -R "<成片的完整路径>"`。
+
 ## 识别台词（可选）
 
 ```bash

@@ -203,3 +203,5 @@ python3 <本技能目录>/scripts/media_profile.py 成片-草稿.mp4 --compare <
 3. 把草稿版和检查结果交给创作者，这是第三个停顿点。他满意了，再渲正式版：
    `npx hyperframes render --quality high --output <成片名>.mp4`。
    正式版也要再跑一遍上面的对比。
+4. 交付时照 SKILL.md 第 6 步的「交付成片时」做：写出成片所在文件夹的路径和链接，并直接打开文件夹、选中成片。
+   草稿版也一样。
