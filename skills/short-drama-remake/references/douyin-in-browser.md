@@ -1,5 +1,9 @@
 # 抖音：用你自己的浏览器取作品详情
 
+先试 `scripts/douyin_edge.mjs`：它用电脑自带的 Edge 或 Chrome 在后台打开作品页，做的就是下面第一条路，
+不需要你自己的浏览器，也不弹窗口（用法见 SKILL.md 第 1 步）。它返回 `ok: false`，或者电脑上没有 Edge、Chrome，
+再按本页用你自己的浏览器。
+
 抖音的分享页不登录就不带视频信息，`fetch_reference.py fetch` 遇到抖音链接会停下，返回
 `need_browser` 和作品号。抖音网页自己能给请求签名，所以由你所在环境的浏览器打开作品页，
 再在页面里取作品详情。Codex 用它自带的浏览器（应用内浏览器，或 Chrome 插件），Claude Code

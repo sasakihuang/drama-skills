@@ -55,8 +55,7 @@
 只学结构和节奏，原片的台词、画面、人物、品牌、配音、音乐一律不进新片。照搬会侵权，平台也会按搬运处理。
 提供「中度」和「大胆」两档，没有「原样照搬」这一档。
 
-需要 Python 3.9 或更新版本、`ffmpeg`、`node` 18 或更新版本；做 K 线、图表这类图文动效片要 `node` 22
-或更新版本，第一次用会在项目里装一次 HyperFrames（Apache-2.0，大约 100 MB）。识别台词是可选的，
+需要 Python 3.9 或更新版本、`ffmpeg`、`node` 22 或更新版本（抖音链接靠它调用电脑自带的 Edge 后台取视频，K 线、图表这类图文动效片也要它）；做图文动效片时，第一次会在项目里装一次 HyperFrames（Apache-2.0，大约 100 MB）。识别台词是可选的，
 第一次用会问你要不要装。
 拉片工具来自 eternityspring/reelbench-skills（Apache-2.0），随技能附带；借鉴的其他项目列在
 `skills/short-drama-remake/references/credits.md`。

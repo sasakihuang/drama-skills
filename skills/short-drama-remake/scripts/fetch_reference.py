@@ -12,7 +12,8 @@ Subcommands
     the video address that the share page already carries. No login, no cookie.
     Douyin: the share page carries nothing without the site's own signing, so
     this prints ``need_browser`` with the work id; the agent then reads the work
-    detail in its own browser (see references/douyin-in-browser.md) and calls
+    detail with scripts/douyin_edge.mjs (the computer's own Edge or Chrome, headless) or
+    in its own browser (see references/douyin-in-browser.md) and calls
     ``douyin-detail``.
 ``douyin-detail <detail.json> --out <dir>``
     Pick the best H.264 rendition from a saved Douyin work-detail response and
@@ -289,7 +290,7 @@ def cmd_fetch(text: str, out: Path) -> None:
         work_id = douyin_id(url)
         emit(False, 3, platform="douyin", need_browser=True, id=work_id,
              page=DOUYIN_HOME + "/video/" + work_id,
-             next="按 references/douyin-in-browser.md 用浏览器取作品详情，存成 JSON 后运行 douyin-detail")
+             next="先运行 node scripts/douyin_edge.mjs <作品号> --out <参考片目录>，再马上运行 douyin-detail；不行再照 references/douyin-in-browser.md 用你自己的浏览器")
     else:
         raise FetchError("目前只支持抖音、快手、小红书的分享链接；别的平台请先在 App 里保存视频，再用 local。")
 

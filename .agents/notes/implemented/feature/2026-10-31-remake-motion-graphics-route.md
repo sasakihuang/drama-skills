@@ -85,3 +85,14 @@ Status: implemented
 - `scripts/my_voices.py`（标准库，不联网、不花钱）：list / save / used / remove，存在 `~/.drama-skills/我的音色/`，
   连同试听录音一起存；同名再存就更新。试听前先列出「我的音色」，选了存好的就跳过试听。
 - 音色设计（按描述生成专属音色）要花钱、要另外报价，用户同意先不做。
+
+## Follow-up 2026-11-03: 抖音改用系统 Edge 后台取
+
+- 另一位朋友装好技能后，抖音链接 13 秒就放弃、让他上传视频：短链能解析出作品号，卡在「用你自己的浏览器」那一步，
+  他的 Codex 没有能用的内置浏览器，或者打不开抖音。同一条链接在本机用页面内 XHR 能取到（主升狼王「一夜持股法
+  八大步骤」，170 秒，1080p）。
+- `scripts/douyin_edge.mjs`（Node 22 内置 WebSocket，无依赖）：找系统里的 Edge 或 Chrome，用无头模式、临时配置
+  启动，走 CDP 打开作品页，把 UA 里的 HeadlessChrome 换掉，等页面签名组件就绪后执行和第一条路相同的 XHR，存
+  `douyin_detail.json`；结束时等浏览器退出再删临时配置。本机实测 5.8 秒，随后 `douyin-detail` 下到 1080p 原片。
+- 现成方案没选：JoeanAmier 等下载器要配 cookie；Playwright 要另下浏览器（上百 MB）。系统 Edge 每台 Windows 都有。
+- SKILL.md 第 1 步改成先跑它，返回 ok:false 再用自带浏览器，最后才请创作者保存；明确不许没试就让创作者上传。

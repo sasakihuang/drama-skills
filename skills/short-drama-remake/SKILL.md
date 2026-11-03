@@ -41,8 +41,16 @@ python3 <本技能目录>/scripts/fetch_reference.py fetch "<创作者发来的�
 
 最后一行是 JSON。`ok: true` 就得到了 `source.mp4` 和 `source.json`。其他情况：
 
-- `need_browser: true`（抖音）：照 [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md)
-  做，打开页面先静音，用完关掉标签页。
+- `need_browser: true`（抖音）：先用电脑自带的 Edge 或 Chrome 在后台取，不弹窗口，几秒钟：
+
+  ```bash
+  node <本技能目录>/scripts/douyin_edge.mjs <作品号> --out <参考片目录>
+  python3 <本技能目录>/scripts/fetch_reference.py douyin-detail <参考片目录>/douyin_detail.json --out <参考片目录>
+  ```
+
+  第一条返回 `ok: true` 就马上跑第二条（视频地址几分钟就过期）。返回 `ok: false`，再照
+  [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md) 用你自己的浏览器试；打开页面先静音，用完关掉标签页。
+  不要没试这两步，就直接让创作者上传视频。
 - 快手和小红书报错：多半是链接放久了失效，或者是电脑网页版链接。请创作者在 App 里重新
   「分享 → 复制链接」。
 - 都不行，或者遇到验证码：请创作者在 App 里保存视频，然后
