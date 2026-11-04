@@ -96,3 +96,14 @@ Status: implemented
   `douyin_detail.json`；结束时等浏览器退出再删临时配置。本机实测 5.8 秒，随后 `douyin-detail` 下到 1080p 原片。
 - 现成方案没选：JoeanAmier 等下载器要配 cookie；Playwright 要另下浏览器（上百 MB）。系统 Edge 每台 Windows 都有。
 - SKILL.md 第 1 步改成先跑它，返回 ok:false 再用自带浏览器，最后才请创作者保存；明确不许没试就让创作者上传。
+
+## Follow-up 2026-11-04: 不再弹 HyperFrames 编辑页
+
+- 朋友反馈复刻时浏览器总弹出 HyperFrames Studio（时间线编辑页）。原因：路线第 0 步让 Codex 读 HyperFrames
+  自带的 SKILL.md，那份说明要求「每种模式下都在渲染前打开 Studio 预览、渲染后让它开着」；`hyperframes preview`
+  不加 `--no-open` 就用默认浏览器打开（0.8.181 的 preview 命令里 `noOpen = !args.open`）。`check`、`snapshot`、
+  `render` 不开浏览器；`open` 开它的桌面 App，`publish` 上传到 HeyGen。
+- 路线文档写明这几条不照做，不跑 preview / play / present / open / publish / skills；创作者明确要手动改时才用
+  `preview --background --no-open` 给链接，`preview --stop` 关掉。SKILL.md 路线说明加一句。
+- 它的「技能过期，运行 skills update」提示只在 stderr 是终端时打印，Codex 的命令通常看不到；仍写明不跑 `skills`，
+  免得把它的技能装进 `~/.codex/skills`。

@@ -43,7 +43,17 @@
   `npx hyperframes doctor` 看环境齐不齐。
 - 动手搭画面前，先读 HyperFrames 自己的说明：`node_modules/hyperframes/dist/skills/hyperframes/SKILL.md`，
   再在终端里看 `npx hyperframes docs compositions`、`docs data-attributes`、`docs gsap`。出错时看
-  `docs troubleshooting`。不用另外装它的技能。
+  `docs troubleshooting`。不用另外装它的技能。那份说明写的是它自己的一整套流程，里面要你渲染前打开
+  Studio 预览、渲染后让预览一直开着、向创作者介绍 HyperFrames 桌面 App：这几条**本技能都不照做**，以本文为准。
+- **不弹网页，不开它的 App。** 不运行 `npx hyperframes preview`、`play`、`present`、`open`：它们会在创作者的
+  默认浏览器里自动弹出 HyperFrames 的编辑页（Studio），或者去开它的桌面 App。创作者没要过，弹出来只是打扰。
+  也不运行 `publish`（会把项目传到 HeyGen 网上）和 `skills`（会把 HyperFrames 的技能装进 Codex，
+  以后的对话也会被它带着开编辑页）。自己看画面用 `check` 和 `snapshot`，给创作者看用渲好的 MP4。
+  只有创作者明确说要在网页里自己动手改，才开编辑页，而且加 `--no-open`，把打印出来的链接发给他自己点：
+  `npx hyperframes preview --background --no-open`。他改完，运行 `npx hyperframes preview --stop` 关掉。
+- 创作者说浏览器里老弹出 HyperFrames 的编辑页：在 `制作/动画/` 里运行 `npx hyperframes preview --stop`，
+  关掉后台的预览，再请他关掉那个网页。要是 Codex 的技能目录（`~/.codex/skills/`）里有 `hyperframes`
+  开头的文件夹，说明以前装过它的技能，告诉创作者，由他决定删不删。
 - 不用 HyperFrames 的 `reverse-any-video`：它是付费功能，而且逐帧照抄原片，违反本技能「内容全换」的规矩。
 
 ## 1. 顺序：先定稿，再配音，画面跟着声音走
@@ -201,7 +211,7 @@ python3 <本技能目录>/scripts/media_profile.py 成片-草稿.mp4 --compare <
 ```
 
    不通过的项先自己修，再重渲。修不了的，在复刻方案的成片对照里写明原因。
-3. 把草稿版和检查结果交给创作者，这是第三个停顿点。他满意了，再渲正式版：
+3. 把草稿版 MP4 和检查结果交给创作者，这是第三个停顿点；不开 Studio 预览页。他满意了，再渲正式版：
    `npx hyperframes render --quality high --output <成片名>.mp4`。
    正式版也要再跑一遍上面的对比。
 4. 交付时照 SKILL.md 第 6 步的「交付成片时」做：写出成片所在文件夹的路径和链接，并直接打开文件夹、选中成片。
