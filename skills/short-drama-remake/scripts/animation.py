@@ -24,8 +24,9 @@ custom, drawn in that style, and a light backdrop is allowed. ``build`` wires ``
 
 ``cues`` prints the timed film as a list: what appears when, beside what the voice says at that
 moment. ``check``, ``snapshot`` and ``render`` run HyperFrames against the folder. Usage statistics, the
-update check and its own skill installer are switched off for every call, and the commands that
-open a browser window or a desktop app, upload the project, or install skills are refused.
+update check and its own skill installer are switched off for every call, it never sees the keys it
+would send frames to an online service with, and the commands that open a browser window or a
+desktop app, upload the project, or install skills are refused.
 The last stdout line is one JSON object.
 """
 
@@ -50,6 +51,10 @@ MINIMUM_PYTHON = (3, 9)
 KIT = Path(__file__).resolve().parents[1] / "assets" / "motion-kit"
 MIRROR = "https://registry.npmmirror.com"
 QUIET = {"HYPERFRAMES_NO_TELEMETRY": "1", "HYPERFRAMES_NO_UPDATE_CHECK": "1", "HYPERFRAMES_SKIP_SKILLS": "1", "NO_COLOR": "1"}
+# Keys the renderer would use to send frames or text to an online service: `snapshot` describes every
+# frame with Gemini whenever a Gemini key is set. Nothing a film is made of leaves this computer.
+CLOUD_KEYS = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "HEYGEN_API_KEY",
+              "HEYGEN_ACCESS_TOKEN", "ELEVENLABS_API_KEY")
 # Read-only or local-only commands. Anything else (preview, play, present, open, publish, skills,
 # auth, cloud, tts, ...) opens a window, leaves this computer, or changes the agent's own setup.
 ALLOWED_TOOLS = {"check", "lint", "validate", "snapshot", "render", "docs", "doctor", "browser", "info",
@@ -182,7 +187,8 @@ def run_tool(folder: Path, arguments: Sequence[str], capture: bool = True, timeo
     entry = home / "node_modules" / "hyperframes" / "bin" / "hyperframes.mjs"
     if not entry.is_file():
         raise Problem("这台电脑还没装动画工具：先运行 animation.py setup <动画目录>。")
-    env = {**os.environ, **QUIET}
+    env = {name: value for name, value in os.environ.items() if name.upper() not in CLOUD_KEYS}
+    env.update(QUIET)
     chosen = home / "browser-path.txt"
     if chosen.is_file() and "HYPERFRAMES_BROWSER_PATH" not in os.environ:
         path = chosen.read_text(encoding="utf-8").strip()
@@ -190,6 +196,19 @@ def run_tool(folder: Path, arguments: Sequence[str], capture: bool = True, timeo
             env["HYPERFRAMES_BROWSER_PATH"] = path
     return subprocess.run([node_program(), str(entry), *arguments], cwd=folder, env=env,
                           capture_output=capture, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+
+
+def ensure_browser(folder: Path) -> Tuple[bool, str]:
+    """Whether the renderer has a browser to draw with, and a note when it had to borrow the computer's own."""
+    if run_tool(folder, ["browser", "ensure"], timeout=1800).returncode == 0:
+        return True, ""
+    # The renderer downloads its own Chrome; where that download is blocked, the computer's own browser will do.
+    own = system_browser()
+    if not own:
+        return False, "渲染用的浏览器没下载下来，电脑上也没找到 Edge 或 Chrome：先装一个再运行 setup。"
+    (shared_home() / "browser-path.txt").write_text(own, encoding="utf-8")
+    ready = run_tool(folder, ["browser", "path"], timeout=120).returncode == 0
+    return ready, f"渲染用的浏览器没下载下来，改用电脑自带的 {Path(own).name}。"
 
 
 def plain(text: str) -> str:
@@ -232,18 +251,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
     sample = folder / "film.json"
     if not sample.is_file():
         shutil.copyfile(KIT / "film.example.json", sample)
-    chosen = Path(install["home"]) / "browser-path.txt"
-    ready = run_tool(folder, ["browser", "ensure"], timeout=1800).returncode == 0
-    browser_note = ""
-    if not ready:
-        # The renderer downloads its own Chrome; where that download is blocked, the computer's own browser will do.
-        own = system_browser()
-        if own:
-            chosen.write_text(own, encoding="utf-8")
-            ready = run_tool(folder, ["browser", "path"], timeout=120).returncode == 0
-            browser_note = f"渲染用的浏览器没下载下来，改用电脑自带的 {Path(own).name}。"
-        else:
-            browser_note = "渲染用的浏览器没下载下来，电脑上也没找到 Edge 或 Chrome：先装一个再运行 setup。"
+    ready, browser_note = ensure_browser(folder)
     print(f"动画工具{'就绪' if ready else '还差一步'}：HyperFrames {install['version']}（{'刚装好' if install['installed_now'] else '已装过'}，全电脑共用）。"
           f"{browser_note}动画目录 {folder} 里放好了 index.html、lib/ 和示例 film.json。")
     emit({"ok": ready, **install, "folder": str(folder), "portrait": upright,
@@ -895,7 +903,7 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
         raise Problem("没有可截的时间点：先运行 build，或者用 --at 给秒数。")
     # Two folders, so that looking closer at a few moments does not wipe the pass over the whole film.
     out = folder / ("snapshots-at" if args.at else "snapshots")
-    done = run_tool(folder, ["snapshot", "--at", ",".join(f"{t:g}" for t in times), "-o", str(out), "--no-end"])
+    done = run_tool(folder, ["snapshot", "--at", ",".join(f"{t:g}" for t in times), "-o", str(out), "--no-end", "--describe", "false"])
     if done.returncode != 0:
         raise Problem("截图失败：" + (plain(done.stderr or done.stdout).strip().splitlines() or ["未知原因"])[-1])
     sheets = sorted(str(p) for p in out.glob("contact-sheet*"))

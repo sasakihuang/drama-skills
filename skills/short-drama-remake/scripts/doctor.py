@@ -153,17 +153,19 @@ def check(route: str) -> List[Dict[str, Any]]:
         add("识别台词", "partial", "还没装", "原片有人说话时，新稿的口气、有没有照搬、每段字数都靠它；不装这几项没法和原片比",
             "见 SKILL.md「识别台词」一节；第一次要下载几百 MB，先问创作者")
 
-    if route == "motion":
-        wanted = ""
-        if ANIMATION_PIN.is_file():
-            wanted = json.loads(ANIMATION_PIN.read_text(encoding="utf-8")).get("dependencies", {}).get("hyperframes", "")
-        installed = HOME / "hyperframes" / "node_modules" / "hyperframes" / "package.json"
-        have = json.loads(installed.read_text(encoding="utf-8")).get("version", "") if installed.is_file() else ""
-        if have and (not wanted or have == wanted):
-            add("动画工具", "ok", f"HyperFrames {have}")
-        else:
-            add("动画工具", "partial", "还没装" if not have else f"装的是 {have}，技能要 {wanted}", "图文动效片在本机做动画",
-                "运行 animation.py setup，它会装好（约 200 MB，全电脑共用一份）")
+    # Both routes need it: every finished film's two covers are drawn with it as well.
+    wanted = ""
+    if ANIMATION_PIN.is_file():
+        wanted = json.loads(ANIMATION_PIN.read_text(encoding="utf-8")).get("dependencies", {}).get("hyperframes", "")
+    installed = HOME / "hyperframes" / "node_modules" / "hyperframes" / "package.json"
+    have = json.loads(installed.read_text(encoding="utf-8")).get("version", "") if installed.is_file() else ""
+    if have and (not wanted or have == wanted):
+        add("动画工具", "ok", f"HyperFrames {have}")
+    else:
+        use = "图文动效片在本机做动画；每条成片的两张封面也用它出图" if route == "motion" else "每条成片的两张封面用它出图"
+        fix = ("运行 animation.py setup，它会装好（约 200 MB，全电脑共用一份）" if route == "motion"
+               else "第一次运行 cover.py make 时自动装（约 200 MB，全电脑共用一份），装之前告诉创作者一声")
+        add("动画工具", "partial", "还没装" if not have else f"装的是 {have}，技能要 {wanted}", use, fix)
 
     free = shutil.disk_usage(Path.home()).free / 1e9
     if free < 3:
@@ -180,7 +182,7 @@ def main() -> None:
         emit({"ok": False, "error": "needs Python %d.%d or newer" % MINIMUM_PYTHON}, 2)
     parser = argparse.ArgumentParser(description="一次查清这台电脑做复刻还缺什么。")
     parser.add_argument("--route", choices=("motion", "drama"), default="motion",
-                        help="motion：图文动效类（还要查动画工具）；drama：剧情和实拍类")
+                        help="motion：图文动效类；drama：剧情和实拍类（动画工具两条都查：封面用它出图）")
     args = parser.parse_args()
     items = check(args.route)
     marks = {"ok": "好  ", "partial": "注意 ", "missing": "缺  "}

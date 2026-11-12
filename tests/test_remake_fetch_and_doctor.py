@@ -169,13 +169,17 @@ class DoctorTests(unittest.TestCase):
             elsewhere.write_text("MINIMAX_API_KEY='abc'\n", encoding="utf-8")
             self.assertEqual(state(DRAMA_SKILLS_ENV=str(elsewhere)), "ok", "in the file DRAMA_SKILLS_ENV names")
 
-    def test_the_animation_tool_is_only_checked_for_the_motion_route(self) -> None:
+    def test_the_animation_tool_is_checked_on_both_routes_for_what_each_needs_it_for(self) -> None:
+        # Every finished film gets two covers drawn with it, a drama as much as a motion-graphics film.
         with tempfile.TemporaryDirectory() as directory:
             motion, _ = self.run_doctor(Path(directory), "--route", "motion")
             drama, _ = self.run_doctor(Path(directory), "--route", "drama")
-            self.assertIn("动画工具", [i["name"] for i in motion["items"]])
-            self.assertNotIn("动画工具", [i["name"] for i in drama["items"]])
-            self.assertEqual(self.item(motion, "动画工具")["state"], "partial")
+            for report in (motion, drama):
+                self.assertEqual(self.item(report, "动画工具")["state"], "partial")
+                self.assertIn("封面", self.item(report, "动画工具")["use"])
+            self.assertIn("做动画", self.item(motion, "动画工具")["use"])
+            self.assertNotIn("做动画", self.item(drama, "动画工具")["use"])
+            self.assertIn("cover.py make", self.item(drama, "动画工具")["fix"])
 
 
 if __name__ == "__main__":

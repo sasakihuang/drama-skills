@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>封面</title>
+    <!-- 本地文件，不走 CDN：lib/、画面和 cover-data.js 都由 cover.py make 放好。 -->
+    <script src="lib/gsap.min.js"></script>
+    <style>
+      /* 思源黑体和马善政毛笔体都是 OFL，可商用。 */
+      @font-face { font-family: "Noto Sans SC"; font-weight: 700;
+        src: url("lib/fonts/noto-sans-sc-chinese-simplified-700-normal.woff2") format("woff2"); }
+      @font-face { font-family: "Noto Sans SC"; font-weight: 900;
+        src: url("lib/fonts/noto-sans-sc-chinese-simplified-900-normal.woff2") format("woff2"); }
+      @font-face { font-family: "Ma Shan Zheng"; font-weight: 400;
+        src: url("lib/fonts/ma-shan-zheng-chinese-simplified-400-normal.woff2") format("woff2"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #050607; }
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #050607;
+        font-family: "Noto Sans SC", sans-serif; --accent: #ffd23f; --glow: rgba(255, 210, 63, 0.55); }
+      .cv-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+      .cv-pic { position: absolute; overflow: hidden; }
+      .cv-pic img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+      .cv-card { border-radius: 28px; box-shadow: 0 34px 90px rgba(0, 0, 0, 0.72), 0 0 0 2px rgba(255, 255, 255, 0.16); }
+      .cv-vignette { background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.5) 100%); }
+      .cv-title { position: absolute; }
+      .cv-row { white-space: nowrap; line-height: 1.18; }
+      .cv-text { display: inline-block; white-space: nowrap; font-weight: 900; line-height: 1.18; color: #fff;
+        -webkit-text-stroke: 0.08em rgba(0, 0, 0, 0.92); paint-order: stroke fill;
+        text-shadow: 0 0.05em 0.22em rgba(0, 0, 0, 0.65); }
+      .cv-text b { font-weight: inherit; color: var(--accent);
+        text-shadow: 0 0 0.32em var(--glow), 0 0.05em 0.22em rgba(0, 0, 0, 0.65); }
+      .cv-brush .cv-row, .cv-brush .cv-text { line-height: 1.08; }
+      .cv-brush .cv-text { font-family: "Ma Shan Zheng", "Noto Sans SC", serif; font-weight: 400; color: var(--accent);
+        -webkit-text-stroke: 0.05em rgba(0, 0, 0, 0.9);
+        text-shadow: 0 0 0.25em var(--glow), 0 0.04em 0.2em rgba(0, 0, 0, 0.7); }
+      .cv-brush .cv-text b { color: #fff; }
+      /* The tag's row is set in the tag's own size, so the line it sits on is no taller than it. */
+      .cv-tag-row { font-size: 0.3em; line-height: 1.2; margin-bottom: 0.5em; white-space: nowrap; }
+      .cv-tag { display: inline-block; white-space: nowrap; font-family: "Noto Sans SC", sans-serif; font-weight: 700;
+        color: #111; background: var(--accent); padding: 0.16em 0.6em 0.2em; border-radius: 0.32em; letter-spacing: 0.03em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-duration="1"></div>
+    <!-- cover-data.js 由 cover.py make 从 封面.json 写出，不要手改。 -->
+    <script src="cover-data.js"></script>
+    <script>
+      (function () {
+        var C = window.COVER || { lines: ["封面"], vertical: {}, horizontal: {} };
+        var root = document.getElementById("root");
+        var W = Number(root.dataset.width), H = Number(root.dataset.height);
+        var UPRIGHT = H > W;
+        var S = (UPRIGHT ? C.vertical : C.horizontal) || {};
+        var accent = C.accent || "#ffd23f";
+        var FULL = S.mode !== "card";
+        var WHERE = S.place || (UPRIGHT ? "top" : "left");
+        var SHAPE = S.aspect || W / H;
+        // What platforms keep when they crop a cover: the middle 3:4 of an upright one (profile grids),
+        // the middle 4:3 of a wide one. The words and the card stay inside it, a margin in from its edges.
+        var band = UPRIGHT ? { x: 0, y: (H - W * 4 / 3) / 2, w: W, h: W * 4 / 3 }
+                           : { x: (W - H * 4 / 3) / 2, y: 0, w: H * 4 / 3, h: H };
+        var pad = Math.min(band.w, band.h) * 0.07;
+        var safe = { x: band.x + pad, y: band.y + pad, w: band.w - 2 * pad, h: band.h - 2 * pad };
+        var BIGGEST = Math.min(W, H) * 0.19;
+        var GAP = Math.min(W, H) * 0.065;
+
+        function rgba(hex, alpha) {
+          var h = String(hex).replace("#", "");
+          if (h.length === 3) h = h.split("").map(function (c) { return c + c; }).join("");
+          var n = parseInt(h, 16);
+          return "rgba(" + ((n >> 16) & 255) + ", " + ((n >> 8) & 255) + ", " + (n & 255) + ", " + alpha + ")";
+        }
+        function px(n) { return n.toFixed(1) + "px"; }
+        function div(parent, cls) {
+          var node = document.createElement("div");
+          node.className = cls;
+          parent.appendChild(node);
+          return node;
+        }
+        function put(node, box) {
+          node.style.left = px(box.x); node.style.top = px(box.y);
+          node.style.width = px(box.w); node.style.height = px(box.h);
+        }
+        function picture(cls, blurred) {
+          var frame = div(root, "cv-pic " + cls);
+          var img = document.createElement("img");
+          img.decoding = "sync";
+          img.src = S.picture;
+          var focus = S.focus || [0.5, 0.5], zoom = S.zoom || 1;
+          var spot = (focus[0] * 100) + "% " + (focus[1] * 100) + "%";
+          img.style.objectPosition = spot;
+          img.style.transformOrigin = spot;
+          // A blurred copy is drawn a little larger, so its soft edges fall outside the cover.
+          img.style.transform = "scale(" + (blurred ? zoom * 1.25 : zoom) + ")";
+          if (blurred) img.style.filter = "blur(" + px(Math.min(W, H) * 0.04) + ") brightness(0.42) saturate(1.2)";
+          frame.appendChild(img);
+          return frame;
+        }
+        function scrim() {
+          var dark = "rgba(0, 0, 0, 0.9)", mid = "rgba(0, 0, 0, 0.52)", none = "rgba(0, 0, 0, 0)";
+          var flat = "linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18))";
+          if (UPRIGHT && WHERE === "bottom") return "linear-gradient(to top, " + dark + " 12%, " + mid + " 40%, " + none + " 62%), " + flat;
+          if (UPRIGHT && WHERE === "middle") return "linear-gradient(" + none + " 22%, " + dark + " 42%, " + dark + " 58%, " + none + " 78%), " + flat;
+          if (UPRIGHT) return "linear-gradient(to bottom, " + dark + " 12%, " + mid + " 40%, " + none + " 62%), " + flat;
+          if (WHERE === "right") return "linear-gradient(to left, " + dark + " 18%, " + mid + " 48%, " + none + " 72%), " + flat;
+          if (WHERE === "center") return "radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.72) 30%, rgba(0, 0, 0, 0.25) 75%), " + flat;
+          return "linear-gradient(to right, " + dark + " 18%, " + mid + " 48%, " + none + " 72%), " + flat;
+        }
+
+        // Built once: pictures, shade, card and words. fit() only sizes and moves them, so a picture
+        // already drawn is never swapped for a new one at the moment the still is taken.
+        root.style.setProperty("--accent", accent);
+        root.style.setProperty("--glow", rgba(accent, 0.55));
+        put(picture("cv-layer", !FULL), { x: 0, y: 0, w: W, h: H });
+        if (FULL) div(root, "cv-layer").style.background = scrim();
+        div(root, "cv-layer cv-vignette");
+        var card = FULL ? null : picture("cv-card", false);
+        var block = div(root, "cv-title" + (C.font === "brush" ? " cv-brush" : ""));
+        var measured = [];
+        if (C.tag) {
+          var tag = document.createElement("span");
+          tag.className = "cv-tag";
+          tag.textContent = C.tag;
+          div(block, "cv-tag-row").appendChild(tag);
+          measured.push(tag);
+        }
+        (C.lines || []).forEach(function (line) {
+          var text = document.createElement("span");
+          text.className = "cv-text";
+          text.innerHTML = line;
+          div(block, "cv-row").appendChild(text);
+          measured.push(text);
+        });
+
+        // The words as large as they can be within a box: as wide as the widest line allows, as tall as the box.
+        function words(box, align) {
+          block.style.left = px(box.x);
+          block.style.width = px(box.w);
+          block.style.textAlign = align;
+          block.style.fontSize = "100px";
+          var widest = 1;
+          measured.forEach(function (node) { widest = Math.max(widest, node.getBoundingClientRect().width); });
+          var tall = Math.max(1, block.getBoundingClientRect().height);
+          block.style.fontSize = Math.min(BIGGEST, 100 * box.w / widest, 100 * box.h / tall).toFixed(2) + "px";
+          return block.getBoundingClientRect().height;
+        }
+
+        function fit() {
+          var tall, top;
+          if (FULL && UPRIGHT) {
+            tall = words({ x: safe.x, w: safe.w, h: safe.h * 0.46 }, "center");
+            top = WHERE === "bottom" ? safe.y + safe.h - tall : WHERE === "middle" ? safe.y + (safe.h - tall) / 2 : safe.y;
+            block.style.top = px(top);
+          } else if (FULL) {
+            var wide = WHERE === "center" ? safe.w : safe.w * 0.62;
+            var x = WHERE === "right" ? safe.x + safe.w - wide : safe.x;
+            tall = words({ x: x, w: wide, h: safe.h * 0.8 }, WHERE === "center" ? "center" : WHERE === "right" ? "right" : "left");
+            block.style.top = px(safe.y + (safe.h - tall) / 2);
+          } else if (UPRIGHT) {
+            // A wide picture on an upright cover: a card across the middle, the words above it (or below).
+            var cw = safe.w, ch = Math.min(cw / SHAPE, safe.h * 0.5);
+            cw = Math.min(cw, ch * SHAPE);
+            tall = words({ x: safe.x, w: safe.w, h: safe.h - ch - GAP }, "center");
+            top = safe.y + (safe.h - tall - GAP - ch) / 2;
+            var below = WHERE === "bottom";
+            put(card, { x: safe.x + (safe.w - cw) / 2, y: below ? top : top + tall + GAP, w: cw, h: ch });
+            block.style.top = px(below ? top + ch + GAP : top);
+          } else {
+            // A tall picture on a wide cover: a card at one side, the words at the other.
+            var hh = safe.h, ww = Math.min(hh * SHAPE, safe.w * 0.45);
+            hh = Math.min(hh, ww / SHAPE);
+            var wordsLeft = WHERE !== "right";
+            tall = words({ x: wordsLeft ? safe.x : safe.x + ww + GAP, w: safe.w - ww - GAP, h: safe.h }, "left");
+            block.style.top = px(safe.y + (safe.h - tall) / 2);
+            put(card, { x: wordsLeft ? safe.x + safe.w - ww : safe.x, y: safe.y + (safe.h - hh) / 2, w: ww, h: hh });
+          }
+        }
+
+        fit();
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+        // The still is taken after a seek: fitting again then measures the words in their own fonts.
+        var tl = gsap.timeline({ paused: true, onUpdate: fit });
+        tl.to({ t: 0 }, { t: 1, duration: 1, ease: "none" });
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;
+      })();
+    </script>
+  </body>
+</html>
