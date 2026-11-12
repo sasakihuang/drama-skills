@@ -2,12 +2,14 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1080, height=1920" />
+    <meta name="viewport" content="width=1080, height=1440" />
     <title>封面</title>
     <!-- 本地文件，不走 CDN：lib/、画面和 cover-data.js 都由 cover.py make 放好。 -->
     <script src="lib/gsap.min.js"></script>
     <style>
       /* 思源黑体和马善政毛笔体都是 OFL，可商用。 */
+      @font-face { font-family: "Noto Sans SC"; font-weight: 400;
+        src: url("lib/fonts/noto-sans-sc-chinese-simplified-400-normal.woff2") format("woff2"); }
       @font-face { font-family: "Noto Sans SC"; font-weight: 700;
         src: url("lib/fonts/noto-sans-sc-chinese-simplified-700-normal.woff2") format("woff2"); }
       @font-face { font-family: "Noto Sans SC"; font-weight: 900;
@@ -15,34 +17,58 @@
       @font-face { font-family: "Ma Shan Zheng"; font-weight: 400;
         src: url("lib/fonts/ma-shan-zheng-chinese-simplified-400-normal.woff2") format("woff2"); }
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #050607; }
-      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #050607;
+      html, body { width: 1080px; height: 1440px; overflow: hidden; background: #050607; }
+      #root { position: relative; width: 1080px; height: 1440px; overflow: hidden; background: #050607;
         font-family: "Noto Sans SC", sans-serif; --accent: #ffd23f; --glow: rgba(255, 210, 63, 0.55); }
       .cv-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
       .cv-pic { position: absolute; overflow: hidden; }
       .cv-pic img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
       .cv-card { border-radius: 28px; box-shadow: 0 34px 90px rgba(0, 0, 0, 0.72), 0 0 0 2px rgba(255, 255, 255, 0.16); }
       .cv-vignette { background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.5) 100%); }
+      /* The poster's picture: one part of a frame, its edges melting into the ground. */
+      .cv-hero { position: absolute; overflow: hidden;
+        -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
+          linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+        -webkit-mask-composite: source-in;
+        mask-image: linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
+          linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+        mask-composite: intersect; }
+      /* The frame's dark parts give way to the poster's own ground (lighten keeps whichever is brighter),
+         so only the subject is laid in, never a box round it; a touch more contrast first sinks the faint
+         glow the frame had behind its subject. */
+      .cv-hero { mix-blend-mode: lighten; }
+      .cv-hero img { position: absolute; display: block; max-width: none; filter: contrast(1.15); }
       .cv-title { position: absolute; }
       .cv-row { white-space: nowrap; line-height: 1.18; }
-      .cv-text { display: inline-block; white-space: nowrap; font-weight: 900; line-height: 1.18; color: #fff;
+      .cv-text, .cv-sub, .cv-en, .cv-tag { display: inline-block; white-space: nowrap; vertical-align: top; }
+      .cv-text { font-weight: 900; line-height: 1.18; color: #fff;
         -webkit-text-stroke: 0.08em rgba(0, 0, 0, 0.92); paint-order: stroke fill;
         text-shadow: 0 0.05em 0.22em rgba(0, 0, 0, 0.65); }
       .cv-text b { font-weight: inherit; color: var(--accent);
         text-shadow: 0 0 0.32em var(--glow), 0 0.05em 0.22em rgba(0, 0, 0, 0.65); }
+      .cv-sub { font-weight: 700; line-height: 1.3; color: var(--accent); letter-spacing: 0.06em; margin-top: 0.42em;
+        -webkit-text-stroke: 0.08em rgba(0, 0, 0, 0.9); paint-order: stroke fill;
+        text-shadow: 0 0.05em 0.22em rgba(0, 0, 0, 0.65); }
+      .cv-en { font-weight: 400; line-height: 1.3; color: rgba(255, 255, 255, 0.55); letter-spacing: 0.36em;
+        text-transform: uppercase; margin-top: 0.9em; padding-left: 0.36em; }
+      .cv-tag { font-weight: 700; line-height: 1.2; color: #111; background: var(--accent); padding: 0.16em 0.6em 0.2em;
+        border-radius: 0.32em; letter-spacing: 0.03em; margin-bottom: 0.5em; }
+      /* On a poster the words sit on a dark ground: they glow instead of wearing an outline. */
+      .cv-poster .cv-text { -webkit-text-stroke: 0; color: #fff4de;
+        text-shadow: 0 0 0.06em rgba(255, 244, 222, 0.6), 0 0 0.4em var(--glow); }
+      .cv-poster .cv-text b { color: var(--accent); text-shadow: 0 0 0.08em var(--glow), 0 0 0.45em var(--glow); }
+      .cv-poster .cv-sub { -webkit-text-stroke: 0; text-shadow: 0 0 0.3em var(--glow); }
+      .cv-light .cv-text { font-weight: 400; letter-spacing: 0.2em; padding-left: 0.2em; }
       .cv-brush .cv-row, .cv-brush .cv-text { line-height: 1.08; }
       .cv-brush .cv-text { font-family: "Ma Shan Zheng", "Noto Sans SC", serif; font-weight: 400; color: var(--accent);
         -webkit-text-stroke: 0.05em rgba(0, 0, 0, 0.9);
         text-shadow: 0 0 0.25em var(--glow), 0 0.04em 0.2em rgba(0, 0, 0, 0.7); }
       .cv-brush .cv-text b { color: #fff; }
-      /* The tag's row is set in the tag's own size, so the line it sits on is no taller than it. */
-      .cv-tag-row { font-size: 0.3em; line-height: 1.2; margin-bottom: 0.5em; white-space: nowrap; }
-      .cv-tag { display: inline-block; white-space: nowrap; font-family: "Noto Sans SC", sans-serif; font-weight: 700;
-        color: #111; background: var(--accent); padding: 0.16em 0.6em 0.2em; border-radius: 0.32em; letter-spacing: 0.03em; }
+      .cv-poster.cv-brush .cv-text { -webkit-text-stroke: 0; text-shadow: 0 0 0.12em var(--glow), 0 0 0.5em var(--glow); }
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-duration="1"></div>
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1440" data-duration="1"></div>
     <!-- cover-data.js 由 cover.py make 从 封面.json 写出，不要手改。 -->
     <script src="cover-data.js"></script>
     <script>
@@ -52,24 +78,30 @@
         var W = Number(root.dataset.width), H = Number(root.dataset.height);
         var UPRIGHT = H > W;
         var S = (UPRIGHT ? C.vertical : C.horizontal) || {};
-        var accent = C.accent || "#ffd23f";
+        var POSTER = S.style === "poster";
         var FULL = S.mode !== "card";
-        var WHERE = S.place || (UPRIGHT ? "top" : "left");
+        var WHERE = S.place || "";
         var SHAPE = S.aspect || W / H;
-        // What platforms keep when they crop a cover: the middle 3:4 of an upright one (profile grids),
-        // the middle 4:3 of a wide one. The words and the card stay inside it, a margin in from its edges.
-        var band = UPRIGHT ? { x: 0, y: (H - W * 4 / 3) / 2, w: W, h: W * 4 / 3 }
-                           : { x: (W - H * 4 / 3) / 2, y: 0, w: H * 4 / 3, h: H };
+        var accent = C.accent || "#ffd23f";
+        // What platforms keep when they crop a cover: the middle 3:4 of an upright one, the middle 4:3 of a
+        // wide one (on a 3:4 or 4:3 cover that is all of it). Words and pictures stay a margin inside it.
+        var band = UPRIGHT ? { x: 0, y: Math.max(0, (H - W * 4 / 3) / 2), w: W, h: Math.min(H, W * 4 / 3) }
+                           : { x: Math.max(0, (W - H * 4 / 3) / 2), y: 0, w: Math.min(W, H * 4 / 3), h: H };
         var pad = Math.min(band.w, band.h) * 0.07;
         var safe = { x: band.x + pad, y: band.y + pad, w: band.w - 2 * pad, h: band.h - 2 * pad };
         var BIGGEST = Math.min(W, H) * 0.19;
         var GAP = Math.min(W, H) * 0.065;
 
-        function rgba(hex, alpha) {
+        function rgb(hex) {
           var h = String(hex).replace("#", "");
           if (h.length === 3) h = h.split("").map(function (c) { return c + c; }).join("");
           var n = parseInt(h, 16);
-          return "rgba(" + ((n >> 16) & 255) + ", " + ((n >> 8) & 255) + ", " + (n & 255) + ", " + alpha + ")";
+          return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+        }
+        function rgba(hex, alpha) { var c = rgb(hex); return "rgba(" + c[0] + ", " + c[1] + ", " + c[2] + ", " + alpha + ")"; }
+        function lift(hex, amount) {
+          var c = rgb(hex).map(function (v) { return Math.round(v + (255 - v) * amount); });
+          return "rgb(" + c[0] + ", " + c[1] + ", " + c[2] + ")";
         }
         function px(n) { return n.toFixed(1) + "px"; }
         function div(parent, cls) {
@@ -82,7 +114,8 @@
           node.style.left = px(box.x); node.style.top = px(box.y);
           node.style.width = px(box.w); node.style.height = px(box.h);
         }
-        function picture(cls, blurred) {
+        function contain(shape, w, h) { return w / h > shape ? { w: h * shape, h: h } : { w: w, h: w / shape }; }
+        function photo(cls, blurred) {
           var frame = div(root, "cv-pic " + cls);
           var img = document.createElement("img");
           img.decoding = "sync";
@@ -100,58 +133,112 @@
         function scrim() {
           var dark = "rgba(0, 0, 0, 0.9)", mid = "rgba(0, 0, 0, 0.52)", none = "rgba(0, 0, 0, 0)";
           var flat = "linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18))";
-          if (UPRIGHT && WHERE === "bottom") return "linear-gradient(to top, " + dark + " 12%, " + mid + " 40%, " + none + " 62%), " + flat;
-          if (UPRIGHT && WHERE === "middle") return "linear-gradient(" + none + " 22%, " + dark + " 42%, " + dark + " 58%, " + none + " 78%), " + flat;
-          if (UPRIGHT) return "linear-gradient(to bottom, " + dark + " 12%, " + mid + " 40%, " + none + " 62%), " + flat;
-          if (WHERE === "right") return "linear-gradient(to left, " + dark + " 18%, " + mid + " 48%, " + none + " 72%), " + flat;
-          if (WHERE === "center") return "radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.72) 30%, rgba(0, 0, 0, 0.25) 75%), " + flat;
-          return "linear-gradient(to right, " + dark + " 18%, " + mid + " 48%, " + none + " 72%), " + flat;
+          var toward = UPRIGHT ? { bottom: "to top", middle: "", top: "to bottom" }[WHERE || "top"]
+                               : { right: "to left", center: "", top: "to bottom", bottom: "to top", left: "to right" }[WHERE || "left"];
+          if (!toward && UPRIGHT) return "linear-gradient(" + none + " 22%, " + dark + " 42%, " + dark + " 58%, " + none + " 78%), " + flat;
+          if (!toward) return "radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.72) 30%, rgba(0, 0, 0, 0.25) 75%), " + flat;
+          return "linear-gradient(" + toward + ", " + dark + " 14%, " + mid + " 44%, " + none + " 68%), " + flat;
         }
 
         // Built once: pictures, shade, card and words. fit() only sizes and moves them, so a picture
         // already drawn is never swapped for a new one at the moment the still is taken.
         root.style.setProperty("--accent", accent);
         root.style.setProperty("--glow", rgba(accent, 0.55));
-        put(picture("cv-layer", !FULL), { x: 0, y: 0, w: W, h: H });
-        if (FULL) div(root, "cv-layer").style.background = scrim();
-        div(root, "cv-layer cv-vignette");
-        var card = FULL ? null : picture("cv-card", false);
-        var block = div(root, "cv-title" + (C.font === "brush" ? " cv-brush" : ""));
-        var measured = [];
-        if (C.tag) {
-          var tag = document.createElement("span");
-          tag.className = "cv-tag";
-          tag.textContent = C.tag;
-          div(block, "cv-tag-row").appendChild(tag);
-          measured.push(tag);
+        var hero = null, heroImg = null, card = null;
+        if (POSTER) {
+          var ground = S.bg || "#050607";
+          root.style.background = "radial-gradient(ellipse at 50% 30%, " + lift(ground, 0.06) + " 0%, " + ground + " 70%)";
+          hero = div(root, "cv-hero");
+          heroImg = document.createElement("img");
+          heroImg.decoding = "sync";
+          heroImg.src = S.picture;
+          hero.appendChild(heroImg);
+        } else {
+          put(photo("cv-layer", !FULL), { x: 0, y: 0, w: W, h: H });
+          if (FULL) div(root, "cv-layer").style.background = scrim();
+          div(root, "cv-layer cv-vignette");
+          card = FULL ? null : photo("cv-card", false);
         }
-        (C.lines || []).forEach(function (line) {
-          var text = document.createElement("span");
-          text.className = "cv-text";
-          text.innerHTML = line;
-          div(block, "cv-row").appendChild(text);
-          measured.push(text);
-        });
+        var font = C.font === "brush" ? " cv-brush" : C.font === "light" ? " cv-light" : "";
+        var block = div(root, "cv-title" + (POSTER ? " cv-poster" : "") + font);
+        function part(cls, text, html) {
+          var node = document.createElement("span");
+          node.className = cls;
+          if (html) node.innerHTML = text; else node.textContent = text;
+          div(block, "cv-row").appendChild(node);
+          return node;
+        }
+        var tag = C.tag ? part("cv-tag", C.tag, false) : null;
+        var titles = (C.lines || []).map(function (line) { return part("cv-text", line, true); });
+        var sub = C.sub ? part("cv-sub", C.sub, false) : null;
+        var en = C.en ? part("cv-en", C.en, false) : null;
 
-        // The words as large as they can be within a box: as wide as the widest line allows, as tall as the box.
+        // The words as large as they can be within a box: the title as wide as its widest line allows,
+        // the lines around it in proportion, each kept to the box's width, all of it to the box's height.
         function words(box, align) {
           block.style.left = px(box.x);
           block.style.width = px(box.w);
           block.style.textAlign = align;
-          block.style.fontSize = "100px";
+          function wide(node) { node.style.fontSize = "100px"; return Math.max(1, node.getBoundingClientRect().width); }
           var widest = 1;
-          measured.forEach(function (node) { widest = Math.max(widest, node.getBoundingClientRect().width); });
-          var tall = Math.max(1, block.getBoundingClientRect().height);
-          block.style.fontSize = Math.min(BIGGEST, 100 * box.w / widest, 100 * box.h / tall).toFixed(2) + "px";
-          return block.getBoundingClientRect().height;
+          titles.forEach(function (node) { widest = Math.max(widest, wide(node)); });
+          var title = Math.min(BIGGEST, 100 * box.w / widest);
+          var sizes = [];
+          titles.forEach(function (node) { sizes.push([node, title]); });
+          if (tag) sizes.push([tag, Math.min(title * 0.3, 100 * box.w / wide(tag))]);
+          if (sub) sizes.push([sub, Math.min(title * 0.32, 100 * box.w / wide(sub))]);
+          if (en) sizes.push([en, Math.min(title * 0.12, 100 * box.w / wide(en))]);
+          function apply(scale) { sizes.forEach(function (pair) { pair[0].style.fontSize = (pair[1] * scale).toFixed(2) + "px"; }); }
+          apply(1);
+          var tall = block.getBoundingClientRect().height;
+          if (tall > box.h) { apply(box.h / tall); tall = block.getBoundingClientRect().height; }
+          return tall;
         }
 
-        function fit() {
+        // The poster's picture: the chosen part of the frame (crop, as shares of it) drawn at the box's size.
+        function showHero(box) {
+          put(hero, box);
+          var crop = S.crop || [0, 0, 1, 1], size = S.size || [W, H];
+          var scale = box.w / (crop[2] * size[0]);
+          heroImg.style.width = px(size[0] * scale);
+          heroImg.style.height = px(size[1] * scale);
+          heroImg.style.left = px(-crop[0] * size[0] * scale);
+          heroImg.style.top = px(-crop[1] * size[1] * scale);
+        }
+
+        function fitPoster() {
+          var tall, room, fitted;
+          var beside = !UPRIGHT && (WHERE === "left" || WHERE === "right" || (!WHERE && SHAPE < 1.15));
+          if (beside) {
+            // A tall picture on the wide cover: the picture at one side, the words at the other.
+            fitted = contain(SHAPE, safe.w * 0.44, safe.h);
+            var wordsLeft = WHERE !== "right";
+            tall = words({ x: wordsLeft ? safe.x : safe.x + fitted.w + GAP, w: safe.w - fitted.w - GAP, h: safe.h }, "left");
+            block.style.top = px(safe.y + (safe.h - tall) / 2);
+            showHero({ x: wordsLeft ? safe.x + safe.w - fitted.w : safe.x, y: safe.y + (safe.h - fitted.h) / 2, w: fitted.w, h: fitted.h });
+            return;
+          }
+          // Otherwise the words across the top (or the bottom) and the picture as large as the rest allows,
+          // the two kept together and the pair centred on the cover.
+          var below = WHERE !== "bottom";
+          var edge = H * 0.06, apart = H * 0.045;
+          tall = words({ x: safe.x, w: safe.w, h: H * 0.36 }, "center");
+          room = H - 2 * edge - tall - apart;
+          fitted = contain(SHAPE, W - pad, Math.max(1, room));
+          var top = (H - (tall + apart + fitted.h)) / 2;
+          block.style.top = px(below ? top : top + fitted.h + apart);
+          showHero({ x: (W - fitted.w) / 2, y: below ? top + tall + apart : top, w: fitted.w, h: fitted.h });
+        }
+
+        function fitPhoto() {
           var tall, top;
           if (FULL && UPRIGHT) {
             tall = words({ x: safe.x, w: safe.w, h: safe.h * 0.46 }, "center");
             top = WHERE === "bottom" ? safe.y + safe.h - tall : WHERE === "middle" ? safe.y + (safe.h - tall) / 2 : safe.y;
             block.style.top = px(top);
+          } else if (FULL && (WHERE === "top" || WHERE === "bottom")) {
+            tall = words({ x: safe.x, w: safe.w, h: safe.h * 0.46 }, "center");
+            block.style.top = px(WHERE === "bottom" ? safe.y + safe.h - tall : safe.y);
           } else if (FULL) {
             var wide = WHERE === "center" ? safe.w : safe.w * 0.62;
             var x = WHERE === "right" ? safe.x + safe.w - wide : safe.x;
@@ -163,9 +250,9 @@
             cw = Math.min(cw, ch * SHAPE);
             tall = words({ x: safe.x, w: safe.w, h: safe.h - ch - GAP }, "center");
             top = safe.y + (safe.h - tall - GAP - ch) / 2;
-            var below = WHERE === "bottom";
-            put(card, { x: safe.x + (safe.w - cw) / 2, y: below ? top : top + tall + GAP, w: cw, h: ch });
-            block.style.top = px(below ? top + ch + GAP : top);
+            var under = WHERE === "bottom";
+            put(card, { x: safe.x + (safe.w - cw) / 2, y: under ? top : top + tall + GAP, w: cw, h: ch });
+            block.style.top = px(under ? top + ch + GAP : top);
           } else {
             // A tall picture on a wide cover: a card at one side, the words at the other.
             var hh = safe.h, ww = Math.min(hh * SHAPE, safe.w * 0.45);
@@ -177,6 +264,7 @@
           }
         }
 
+        function fit() { if (POSTER) fitPoster(); else fitPhoto(); }
         fit();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
         // The still is taken after a seek: fitting again then measures the words in their own fonts.
