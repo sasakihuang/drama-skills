@@ -30,9 +30,16 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 MINIMUM_PYTHON = (3, 9)
+
+# A remake is meant to run as long as its reference.
+LENGTH_TOLERANCE = 0.10
+# This many LU under the reference and the difference is plain to hear side by side.
+QUIETER_NOTE = 3.0
+# The loudest level mix_audio.py will mix to when asked to match a reference.
+LOUDEST_MIX = -11.0
 
 PAUSE_DB = -40
 PAUSE_MIN = 0.25
@@ -42,7 +49,7 @@ STILL_MIN = 1.0
 SPOKEN = re.compile(r"[0-9A-Za-z㐀-鿿]")
 
 
-def emit(payload: Dict[str, Any], code: int = 0) -> None:
+def emit(payload: Dict[str, Any], code: int = 0) -> NoReturn:
     print(json.dumps(payload, ensure_ascii=False))
     sys.exit(code)
 
@@ -165,13 +172,16 @@ def profile(path: Path, transcript: Optional[Path]) -> Dict[str, Any]:
 
 
 def compare(new: Dict[str, Any], ref: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Each check is a pass or a fail; a "note" is something to know that is neither: a comparison
+    that could not be made, or a difference that is allowed but will be noticed."""
     checks: List[Dict[str, Any]] = []
 
-    def check(name: str, ok: bool, detail: str) -> None:
-        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+    def check(name: str, ok: bool, detail: str, note: bool = False) -> None:
+        checks.append({"check": name, "ok": bool(ok), "level": "note" if note else ("pass" if ok else "fail"), "detail": detail})
 
     nd, rd = new["duration_s"], ref["duration_s"]
-    check("时长接近", abs(nd - rd) <= rd * 0.15, f"新片 {nd} 秒，原片 {rd} 秒")
+    check("时长接近", abs(nd - rd) <= rd * LENGTH_TOLERANCE,
+          f"新片 {nd} 秒，原片 {rd} 秒（{nd / rd - 1:+.0%}；上下 {LENGTH_TOLERANCE:.0%} 以内算接近）")
     nm, rm = new.get("motion"), ref.get("motion")
     if nm and rm:
         limit = max(2.5, rm["longest_still_s"] + 1.0)
@@ -191,12 +201,22 @@ def compare(new: Dict[str, Any], ref: Dict[str, Any]) -> List[Dict[str, Any]]:
         loud = na["integrated_lufs"]
         check("音量够", loud is not None and loud >= -15.0,
               f"新片 {loud} LUFS，原片 {ra['integrated_lufs']} LUFS，至少 -15")
+        heard = ra.get("integrated_lufs")
+        if loud is not None and heard is not None and heard - loud >= QUIETER_NOTE:
+            if loud >= LOUDEST_MIX - 0.7:
+                check("和原片一样响", True, f"原片特别响（{heard} LUFS），新片 {loud} LUFS 已经混到上限，再响人声会被压扁。"
+                      "放在一起新片会轻一些，这是有意的。", note=True)
+            else:
+                check("和原片一样响", True, f"新片比原片轻 {heard - loud:.1f} LU，和原片放在一起会明显轻一截。"
+                      "混音时给 mix_audio.py 加 --like <参考片的 source.profile.json>，音量就贴着原片。", note=True)
         peak = na["true_peak_dbfs"]
         check("不爆音", peak is not None and peak <= -0.5, f"真峰值 {peak} dBFS，不超过 -0.5")
     ns, rs = new.get("speech"), ref.get("speech")
     if ns and rs:
         check("语速不拖", ns["chars_per_second"] >= rs["chars_per_second"] * 0.85,
               f"新片每秒 {ns['chars_per_second']} 字，原片 {rs['chars_per_second']} 字")
+    elif rs:
+        check("语速不拖", True, "没法比：成片旁边没有 transcript.json。先对成片跑一遍 transcribe.py，再跑一次这条对照。", note=True)
     return checks
 
 
@@ -230,9 +250,11 @@ def main() -> None:
         result["compared_with"] = args.compare.name
         result["checks"] = checks
         payload["checks"] = checks
-        payload["failed"] = [c["check"] for c in checks if not c["ok"]]
+        payload["failed"] = [c["check"] for c in checks if c["level"] == "fail"]
+        payload["notes"] = [c["check"] for c in checks if c["level"] == "note"]
+        label = {"pass": "通过  ", "fail": "不通过 ", "note": "提示  "}
         for item in checks:
-            print(("通过  " if item["ok"] else "不通过 ") + item["check"] + "：" + item["detail"])
+            print(label[item["level"]] + item["check"] + "：" + item["detail"])
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     emit(payload)
 

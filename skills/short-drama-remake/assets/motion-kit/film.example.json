@@ -1,0 +1,44 @@
+{
+  "说明": "这是示例，没有配音，所以每个画面用 seconds 写死时长，at 写秒数（从这个画面开头算）。真做片子时：画面用 segment 指明它管时间表里的第几段，at 直接写旁白里的几个字（说到这几个字时出现）。完整写法见技能的 references/film-json.md。文字里用 **两个星号** 包住的词显示成重点色。",
+  "palette": { "bg": "#050607", "up": "#ff3b3b", "down": "#2fe0d0", "key": "#ffd23f", "text": "#f5f7fa" },
+  "keywords": ["放量", "回落", "三句"],
+  "scenes": [
+    { "type": "title", "seconds": 2.8, "text": "放量突破\n**追不追**", "sub": "看清三件事再动手" },
+    {
+      "type": "kline", "seconds": 7.6, "header": "先看**冲出去**的这一根", "shape": "breakout", "bars": 44, "seed": 7, "show": "key+1",
+      "lines": [{ "price": "support", "to": "resistance", "at": 1.6, "label": "横了很久的区间" }],
+      "focus": [
+        { "bar": "key", "at": 3.2, "note": "价**冲出**区间", "until": 4.6 },
+        { "bar": "key", "point": "volume", "at": 5.4, "note": "量也**放大**" }
+      ]
+    },
+    {
+      "type": "kline", "seconds": 4.8, "continue": true, "header": "先看**冲出去**的这一根",
+      "focus": [{ "bars": ["key+1", "key+8"], "at": 2.2, "note": "回落后\n**又站上去**" }]
+    },
+    {
+      "type": "points", "seconds": 5.6, "header": "再问自己**三句**",
+      "items": [
+        { "title": "量比平时大多少", "body": "和最近二十天比，不和昨天比" },
+        { "title": "冲出去的位置在哪", "body": "横了很久才冲，和涨了一大段再冲，不是一回事" },
+        { "title": "第二天站没站住", "body": "站不住，就当没发生过" }
+      ]
+    },
+    {
+      "type": "bars", "seconds": 5.0, "header": "放量，是和**谁**比", "unit": "倍", "emphasize": "max",
+      "items": [
+        { "label": "二十天平均", "value": 1 },
+        { "label": "昨天", "value": 1.3 },
+        { "label": "今天", "value": 3.2 }
+      ]
+    },
+    { "type": "number", "seconds": 3.6, "header": "给它一个期限", "value": 3, "suffix": "天", "label": "三天回不到线上，**认错**" },
+    {
+      "type": "compare", "seconds": 5.2, "header": "同样的开头，两种结局",
+      "left": { "title": "站稳了", "shape": "breakout", "seed": 3, "line": "resistance", "verdict": "跟", "good": true, "at": 2.2 },
+      "right": { "title": "又掉回去", "shape": "fakeout", "seed": 5, "line": "resistance", "verdict": "撤", "good": false, "at": 3.2 }
+    },
+    { "type": "statement", "seconds": 3.4, "lines": ["看见放量，**先别追**", "等它站住，**再动手**"] },
+    { "type": "end", "seconds": 2.2, "text": "图表均为示意，不构成投资建议", "badge": "AI 配音" }
+  ]
+}

@@ -12,9 +12,10 @@ outside the catalog are refused: their licence has not been checked.
 ``fetch`` downloads ``<id>.mp3`` into ``--out`` (reused when already there), measures it, and
 writes ``配乐垫底.wav``: the music from its first sound to its last (fade-out tails dropped), looped with 1.5 s crossfades when the
 film is longer than the track, cut to ``--length``, faded in and out, and set ``--gap`` LU under
-the narration's measured loudness (13 by default). It also writes ``配乐来源.md`` for the delivery
-notes. The bed is ready to mix as is: no further volume change is needed. The last stdout line is
-one JSON object.
+the narration's measured loudness (13 by default). Without ``--voice`` (a film nobody speaks in)
+the bed is set to a moderate level of its own. It also writes ``配乐来源.md`` for the delivery
+notes: every candidate track in the folder, and which one the bed was made from. The bed is ready
+to mix as is: no further volume change is needed. The last stdout line is one JSON object.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ import urllib.error
 import urllib.request
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 MINIMUM_PYTHON = (3, 9)
 
@@ -44,7 +45,7 @@ AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, li
 CROSSFADE = 1.5
 
 
-def emit(payload: Dict[str, Any], code: int = 0) -> None:
+def emit(payload: Dict[str, Any], code: int = 0) -> NoReturn:
     print(json.dumps(payload, ensure_ascii=False))
     sys.exit(code)
 
@@ -153,6 +154,37 @@ def cmd_list(args: argparse.Namespace) -> None:
     emit({"ok": True, "moods": catalog["moods"], "tracks": tracks})
 
 
+BED_MARK = "垫底用的是这一首"
+# Loudness of a bed made without a narration to sit under.
+ALONE_LUFS = -18.0
+
+
+def write_notes(out: Path, tracks: List[Dict[str, Any]], bed_from: Optional[int]) -> Path:
+    """The record for the delivery notes: every candidate track in the folder, and which one the
+    bed was made from. Fetching a second candidate must not wipe the first one's entry."""
+    notes = out / "配乐来源.md"
+    if bed_from is None and notes.is_file():
+        earlier = re.search(r"Mixkit 编号 (\d+)[^\n]*" + BED_MARK, notes.read_text(encoding="utf-8"))
+        bed_from = int(earlier.group(1)) if earlier else None
+    known = {int(track["id"]): track for track in tracks}
+    lines = ["# 配乐来源", ""]
+    for source in sorted(out.glob("mixkit-*.mp3")):
+        number = re.fullmatch(r"mixkit-(\d+)", source.stem)
+        track = known.get(int(number.group(1))) if number else None
+        if track is None:
+            continue
+        mark = f"（{BED_MARK}）" if int(track["id"]) == bed_from else ""
+        stamp = date.fromtimestamp(source.stat().st_mtime).isoformat()
+        lines += [f"- 曲目：{track['name']}（{track['artist']}），Mixkit 编号 {track['id']}{mark}",
+                  f"  - 下载：{stamp}，文件 `{source.name}`，SHA-256 {hashlib.sha256(source.read_bytes()).hexdigest()}"]
+    lines += ["",
+              f"许可：Mixkit Stock Music Free License（{MIXKIT_LICENSE}）。可用于商用和社交平台视频，"
+              "不用署名；不可用于 CD/DVD、广播电视、游戏，不可混音成纯音乐作品，不可登记到版权识别系统。",
+              "", "收到平台版权认领时，把详情发给 Mixkit 处理。", ""]
+    notes.write_text("\n".join(lines), encoding="utf-8")
+    return notes
+
+
 def cmd_fetch(args: argparse.Namespace) -> None:
     catalog = load_catalog()
     track = next((t for t in catalog["tracks"] if t["id"] == args.id), None)
@@ -173,26 +205,22 @@ def cmd_fetch(args: argparse.Namespace) -> None:
         "last_sound_s": round(end, 2),
         "music_lufs": music, "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
     }
+    gain: Optional[float] = None
     if args.voice:
         voice = loudness(args.voice)
         gain = (voice - args.gap) - music
         result.update({"voice_lufs": voice, "gap_lu": args.gap, "gain_db": round(gain, 2)})
-        if args.length:
-            bed = out / "配乐垫底.wav"
-            copies = render_bed(source, bed, start, end - start, args.length, gain,
-                                args.fade_in, args.fade_out)
-            result.update({"bed": str(bed), "length_s": args.length, "copies": copies,
-                           "bed_lufs": loudness(bed)})
-    notes = out / "配乐来源.md"
-    notes.write_text(
-        "# 配乐来源\n\n"
-        f"- 曲目：{track['name']}（{track['artist']}），Mixkit 编号 {args.id}\n"
-        f"- 下载：{date.today().isoformat()}，文件 `{source.name}`，SHA-256 {result['sha256']}\n"
-        f"- 许可：Mixkit Stock Music Free License（{MIXKIT_LICENSE}）。可用于商用和社交平台视频，"
-        "不用署名；不可用于 CD/DVD、广播电视、游戏，不可混音成纯音乐作品，不可登记到版权识别系统。\n"
-        "- 收到平台版权认领时，把详情发给 Mixkit 处理。\n",
-        encoding="utf-8",
-    )
+    elif args.length:
+        # A film nobody speaks in: the music is the sound, at a level the edit can still raise or lower.
+        gain = ALONE_LUFS - music
+        result.update({"alone_lufs": ALONE_LUFS, "gain_db": round(gain, 2)})
+    if args.length and gain is not None:
+        bed = out / "配乐垫底.wav"
+        copies = render_bed(source, bed, start, end - start, args.length, gain,
+                            args.fade_in, args.fade_out)
+        result.update({"bed": str(bed), "length_s": args.length, "copies": copies,
+                       "bed_lufs": loudness(bed)})
+    notes = write_notes(out, catalog["tracks"], args.id if "bed" in result else None)
     result["notes"] = str(notes)
     emit(result)
 
@@ -209,7 +237,8 @@ def main() -> None:
     fetch = sub.add_parser("fetch", help="download one track and build the music bed")
     fetch.add_argument("id", type=int)
     fetch.add_argument("--out", type=Path, required=True, help="folder for the track and the bed")
-    fetch.add_argument("--voice", type=Path, help="the finished narration, to set the music under it")
+    fetch.add_argument("--voice", type=Path, help="the finished narration, to set the music under it; "
+                       "leave it out for a film nobody speaks in")
     fetch.add_argument("--length", type=float, help="film length in seconds; builds 配乐垫底.wav")
     fetch.add_argument("--gap", type=float, default=13.0, help="how far under the narration, in LU")
     fetch.add_argument("--fade-in", type=float, default=0.5)

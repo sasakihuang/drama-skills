@@ -11,10 +11,11 @@ Subcommands
     Kuaishou and Xiaohongshu: open the share link the way a phone does and read
     the video address that the share page already carries. No login, no cookie.
     Douyin: the share page carries nothing without the site's own signing, so
-    this prints ``need_browser`` with the work id; the agent then reads the work
-    detail with scripts/douyin_edge.mjs (the computer's own Edge or Chrome, headless) or
-    in its own browser (see references/douyin-in-browser.md) and calls
-    ``douyin-detail``.
+    this runs scripts/douyin_edge.mjs (the computer's own Edge or Chrome,
+    headless, needs Node 22) to read the work detail and downloads at once.
+    Only when that cannot be done does it print ``need_browser`` with the work
+    id; the agent then reads the detail in its own browser (see
+    references/douyin-in-browser.md) and calls ``douyin-detail``.
 ``douyin-detail <detail.json> --out <dir>``
     Pick the best H.264 rendition from a saved Douyin work-detail response and
     download it.
@@ -31,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -250,6 +252,40 @@ def douyin_id(url: str) -> str:
     return match.group(1)
 
 
+EDGE_SCRIPT = Path(__file__).resolve().with_name("douyin_edge.mjs")
+EDGE_TIMEOUT = 120
+
+
+def edge_detail(work_id: str, out: Path, command: Optional[List[str]] = None) -> Tuple[Optional[Path], str]:
+    """Read one work's detail with the computer's own browser, headless.
+
+    Returns (saved detail file, "") or (None, why it could not be done)."""
+    if command is None:
+        node = shutil.which("node")
+        if not node:
+            return None, "没装 Node.js"
+        version = subprocess.run([node, "--version"], capture_output=True, text=True).stdout.strip()
+        major = re.match(r"v(\d+)", version)
+        if not major or int(major.group(1)) < 22:
+            return None, f"Node.js 版本是 {version or '未知'}，后台取抖音要 22 或更新"
+        command = [node, str(EDGE_SCRIPT)]
+    try:
+        run = subprocess.run(command + [work_id, "--out", str(out)], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=EDGE_TIMEOUT,
+                             env={**os.environ, "NO_COLOR": "1"})
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return None, f"后台浏览器没跑成：{type(error).__name__}"
+    lines = [line for line in (run.stdout or "").splitlines() if line.strip()]
+    try:
+        result = json.loads(lines[-1]) if lines else {}
+    except ValueError:
+        result = {}
+    detail = out / "douyin_detail.json"
+    if result.get("ok") and detail.is_file():
+        return detail, ""
+    return None, str(result.get("error") or "后台浏览器没有返回作品详情")
+
+
 def douyin_detail(detail_file: Path, out: Path) -> None:
     raw = json.loads(detail_file.read_text(encoding="utf-8"))
     detail = raw.get("aweme_detail") if isinstance(raw, dict) and "aweme_detail" in raw else raw
@@ -279,7 +315,7 @@ def douyin_detail(detail_file: Path, out: Path) -> None:
 
 
 # ------------------------------------------------------------------- main
-def cmd_fetch(text: str, out: Path) -> None:
+def cmd_fetch(text: str, out: Path, use_browser: bool = True) -> None:
     url = first_url(text)
     platform = platform_of(url)
     if platform == "kuaishou":
@@ -288,9 +324,14 @@ def cmd_fetch(text: str, out: Path) -> None:
         xhs(url, out)
     elif platform == "douyin":
         work_id = douyin_id(url)
+        reason = "已按 --no-browser 跳过"
+        if use_browser:
+            detail, reason = edge_detail(work_id, out)
+            if detail is not None:
+                douyin_detail(detail, out)
         emit(False, 3, platform="douyin", need_browser=True, id=work_id,
-             page=DOUYIN_HOME + "/video/" + work_id,
-             next="先运行 node scripts/douyin_edge.mjs <作品号> --out <参考片目录>，再马上运行 douyin-detail；不行再照 references/douyin-in-browser.md 用你自己的浏览器")
+             page=DOUYIN_HOME + "/video/" + work_id, tried=reason,
+             next="电脑自带的浏览器没取到。照 references/douyin-in-browser.md 用你自己的浏览器取作品详情，再运行 douyin-detail；还不行就请创作者在 App 里保存视频")
     else:
         raise FetchError("目前只支持抖音、快手、小红书的分享链接；别的平台请先在 App 里保存视频，再用 local。")
 
@@ -311,6 +352,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_fetch = sub.add_parser("fetch", help="抖音/快手/小红书分享文字或链接")
     p_fetch.add_argument("text")
+    p_fetch.add_argument("--no-browser", action="store_true", help="抖音不调用电脑自带的浏览器，只返回作品号")
     p_detail = sub.add_parser("douyin-detail", help="浏览器取到的抖音作品详情 JSON")
     p_detail.add_argument("detail")
     p_local = sub.add_parser("local", help="创作者自己保存的视频文件")
@@ -322,7 +364,7 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     try:
         if args.cmd == "fetch":
-            cmd_fetch(args.text, out)
+            cmd_fetch(args.text, out, not args.no_browser)
         elif args.cmd == "douyin-detail":
             douyin_detail(Path(args.detail).expanduser().resolve(), out)
         else:

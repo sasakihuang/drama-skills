@@ -12,11 +12,14 @@ license: MIT
 
 出片分两条路线，拆解时定下走哪条：
 
-- **剧情和实拍类**（画面里有人、有实景、有商品）：交给 AI 出图、出视频的出片流程。
+- **剧情和实拍类**（有剧情：人物在做事，有场景，有商品演示）：交给 AI 出图、出视频的出片流程，
+  每个镜头都要花钱生成。
 - **图文动效类**（画面里没有人，主体是 K 线、图表、数据、文字在动）：用 HyperFrames 在本机做动画，
-  见 [图文动效路线](references/motion-graphics-route.md)。这类片**不准**用画静态图的库逐帧拼图，
+  见 [图文动效路线](references/motion-graphics-route.md)。一个人对着镜头讲的口播片默认也走这条：
+  AI 做不出原片那个人，就把他讲的内容做成大字、图解和数据动画，配上旁白。这类片**不准**用画静态图的库逐帧拼图，
   那样做出来就是幻灯片。也不打开 HyperFrames 的网页编辑页（`hyperframes preview` 会自动弹浏览器），
-  给创作者看渲好的 MP4。
+  给创作者看渲好的 MP4。原片本身就是 [风格库](references/styles.md) 里的某种画风（扁平插画、线条、玻璃卡片……），
+  新片题材也适合这种画风，才照那一种画；两头有一头对不上，就用默认模板，不硬套。
 
 创作者多半不懂技术：跟他说大白话，先说结果；工具和格式的事你自己处理，不拿来问他。
 
@@ -25,14 +28,27 @@ license: MIT
 - Python 3.9 或更新版本（下载、识别台词的脚本只用标准库）。
 - `ffmpeg` 和 `ffprobe`：拉片、抽帧、剪辑都要用。没有就先帮创作者装上。
 - `node` 18 或更新：拉片工具用。用 `npx` 装过技能的电脑本来就有。
-- 一个能执行页面脚本的浏览器：只有抖音需要，用你所在环境自带的就行。
-- 可选：本机识别台词，见下文「识别台词（可选）」。不装就读画面上的字幕。
+- 抖音链接：电脑自带的 Edge 或 Chrome，加 Node.js 22 或更新的版本，脚本用它们在后台取作品。
+  没有时才用你所在环境自带的、能执行页面脚本的浏览器。快手和小红书不需要浏览器。
+- 本机识别台词的程序：原片有人说话时要用，第一次用时问创作者装不装，见下文「识别台词」。
+  不装也能做，但新稿的口气和有没有照搬没法和原片比，字数只能估。
 - 图文动效路线另外要 Node.js 22 或更新的版本，第一次用时装一次 HyperFrames，见那份文档的第 0 步。
+
+不确定这台电脑缺什么，先跑一次体检（免费，几秒，只看不装）：
+
+```bash
+python3 <本技能目录>/scripts/doctor.py
+```
+
+它逐项说有没有、缺的那一样是干什么用的、怎么装。缺的东西一次问清创作者要不要装，不要撞一次错问一次。
+
+下文的命令都写 `python3`。Windows 上的 `python3` 常常是应用商店的占位程序，一运行就弹商店：改用 `python` 或 `py -3`。
 
 ## 流程
 
-参考片目录统一放在项目的 `项目开发/remake/<R编号>/`（第一条是 `R01`）。下文的
-`<本技能目录>` 指本文件所在目录。
+先定一个项目文件夹（名字用创作者的叫法，没有就取原片标题里的词，以后能改），这条片子的东西都放进去。
+参考片目录是它里面的 `项目开发/remake/<R编号>/`（第一条是 `R01`）。这时还不用建项目：方案定稿后，再在这个
+文件夹上按 `$short-drama` 的做法建，里面已经有东西不碍事。下文的 `<本技能目录>` 指本文件所在目录。
 
 ### 1. 下载原片（免费）
 
@@ -40,18 +56,12 @@ license: MIT
 python3 <本技能目录>/scripts/fetch_reference.py fetch "<创作者发来的整段分享文字或链接>" --out <参考片目录>
 ```
 
-最后一行是 JSON。`ok: true` 就得到了 `source.mp4` 和 `source.json`。其他情况：
+最后一行是 JSON。`ok: true` 就得到了 `source.mp4` 和 `source.json`。抖音链接也是这一条命令：它会用电脑
+自带的 Edge 或 Chrome 在后台取作品、接着下载，不弹窗口，二十秒左右。其他情况：
 
-- `need_browser: true`（抖音）：先用电脑自带的 Edge 或 Chrome 在后台取，不弹窗口，几秒钟：
-
-  ```bash
-  node <本技能目录>/scripts/douyin_edge.mjs <作品号> --out <参考片目录>
-  python3 <本技能目录>/scripts/fetch_reference.py douyin-detail <参考片目录>/douyin_detail.json --out <参考片目录>
-  ```
-
-  第一条返回 `ok: true` 就马上跑第二条（视频地址几分钟就过期）。返回 `ok: false`，再照
-  [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md) 用你自己的浏览器试；打开页面先静音，用完关掉标签页。
-  不要没试这两步，就直接让创作者上传视频。
+- `need_browser: true`（抖音）：电脑自带的浏览器没取到，原因在 `tried` 里（没装 Node.js 22、没有 Edge 和 Chrome、
+  遇到验证页）。照 [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md) 用你自己的浏览器试；
+  打开页面先静音，用完关掉标签页。不要没试这一步，就直接让创作者上传视频。
 - 快手和小红书报错：多半是链接放久了失效，或者是电脑网页版链接。请创作者在 App 里重新
   「分享 → 复制链接」。
 - 都不行，或者遇到验证码：请创作者在 App 里保存视频，然后
@@ -66,7 +76,25 @@ python3 <本技能目录>/scripts/fetch_reference.py fetch "<创作者发来的�
 `validate` 过门 → `render` 出 `shots.md` 和 `shots-report.html`。文中的 `{baseDir}` 是
 `<本技能目录>/vendor/video-shots`。跳过的门要明说原因。
 
-有台词的片子先识别台词（见下文，可选），把画面字幕和识别结果对照着读；以画面字幕为准。
+那份说明里凡是用 `>` 把输出存成文件的命令，都改用本技能的 `shots.py` 来存，`--` 后面照抄原来的命令和参数。
+Windows 自带的 PowerShell 用 `>` 存出来的文件编码不对，下一步会读不了；它也不认 `&&`。四处是：
+
+```bash
+python3 <本技能目录>/scripts/shots.py --out shots.json -- seed source.mp4 --track track.json --title "<片名>"
+python3 <本技能目录>/scripts/shots.py --out shots.json -- recut shots.json --track track.json --split 63.5 --merge 45.97
+python3 <本技能目录>/scripts/shots.py --out shots.md -- render shots.json --md --track track.json
+python3 <本技能目录>/scripts/shots.py --out shots-report.html -- render shots.json --html --track track.json --video source.mp4
+```
+
+`frames`、`sheet`、`validate` 不存文件，照那份说明直接跑。`recut` 合并过镜头以后，先删掉 `frames/` 再重跑 `frames`，
+不然被并掉的镜头的旧图还留着。
+
+**量不出切点的片子**（`seed` 报 0 个或只有几个切点）有两种：一镜到底的实拍，和一张画布上东西长出来又擦掉的
+图文动效片。不要一路把阈值往下调，照 [拆解方法](references/analysis-framework.md) 里「量不出切点时」一节按时间分段。
+
+先识别台词（见下文「识别台词」）。有人说话（口播、旁白、对白），把画面字幕和识别结果对照着读，以画面字幕为准。
+识别出来一句都没有、画面上也没有字幕和张嘴说话的人，就是**原片没人说话**：下面量口气那一步跳过，后面写完剧本
+也不用查口气和照搬；拆解报告的「台词来源」写「原片没有人说话」。
 
 然后量声音和画面（免费，几十秒）：
 
@@ -76,19 +104,34 @@ python3 <本技能目录>/scripts/media_profile.py <参考片目录>/source.mp4
 
 它在旁边写一份 `source.profile.json`，内容包括：响度；人声之间停顿多不多（几乎没有停顿，说明底下
 垫着配乐）；画面最长多久不动；有识别结果时，还有每秒说几个字。原片的声音你听不见，这些数字就是
-你对原片声音的全部依据，写进拆解报告，成片出来后还要拿它对照。
+你对原片声音的全部依据，写进拆解报告，成片出来后还要拿它对照。原片没人说话时，「几乎没有停顿」只说明声音
+没断过，是配乐还是环境声分不出来：报告里写「待创作者确认」。
+
+有识别结果时，再量原片的口气（免费，一秒）：
+
+```bash
+python3 <本技能目录>/scripts/script_check.py profile <参考片目录>
+```
+
+它写一份 `source.tone.json`：原片每行几个字，打折扣的词、下判断的词和「你」各有多密。新稿写完要拿它对照。
 
 ### 3. 拆解：为什么火（免费）
 
 照 [拆解方法](references/analysis-framework.md) 写 `拆解报告.md`，模板在
 [报告模板](references/report-templates.md)。事实和推测分开写；每条「为什么火」都要指到秒和镜号。
 关键镜头抽 4 帧时间条看清动作。报告里要写明片型和出片路线（剧情实拍 / 图文动效），还要写
-原片的口气：是自信下判断，还是娓娓道来，是吐槽，还是煽情。
+原片的口气：是自信下判断，还是娓娓道来，是吐槽，还是煽情，并附上 `profile` 量出的那几个数。
+图文动效类再写一句画风：原片是不是 [风格库](references/styles.md) 里的某种画风、新片题材合不合，两头都对上才用，
+不然用默认模板。
 
 ### 4. 复刻方案初稿，然后第一次停下
 
 照 [复刻尺度](references/remake-policy.md) 和报告模板写 `复刻方案.md` 初稿：推荐一个新题材和尺度，
 写出段落一级的逐镜对照和节奏档案提议。
+
+讲知识、讲观点的片子没有人物和故事可换，「新题材」是这个意思：推荐的那一个讲**同一个知识点、同一个结论**，
+换一套说法、比方、例子和数据（中度）；备选里再给一两个「照这个结构讲另一个知识点」的（大胆）。两种都要写清
+是哪一种，让创作者知道自己选的是什么。
 
 **停下之前先出网页预览。** 创作者看 Markdown 原文很吃力，方案要给他排好版的网页：
 
@@ -106,37 +149,48 @@ python3 <本技能目录>/scripts/plan_preview.py <参考片目录>
   再把链接发给他。
 - 网页预览只用在这一步。后面的试听选声、定配乐和交付照原来的做法，不另外做网页。
 
-**停下。** 先用三五句话讲清它为什么火、能仿几成，再用选项卡给创作者三条路：
+**停下。** 先用三五句话讲清它为什么火、能仿几成（图文动效类定了用风格库的，再讲一句画风和要多花的时间），
+再用选项卡给创作者三条路：
 照推荐的走 / 换题材或换尺度 / 说出自己的想法让你改。选第三条就照他的话改方案，逐条讲改了什么，
 再问一次，可以来回改很多轮，**他说满意之前不往下走**。做法见报告模板最后一节。
+
+新片默认照原片的观点讲，只换说法、例子和数据。你认为原片有讲错或讲得太满的地方，不要自己改掉：
+逐条写进方案，在这次停顿里一并问他照原片讲、只改这几处，还是换个观点。
 
 ### 5. 交给出片流程
 
 **图文动效类**照 [图文动效路线](references/motion-graphics-route.md) 做：旁白稿仍交给
-`$short-drama-write`，配音走 `$short-drama-produce` 的报价和确认，动画、混音和渲染在 HyperFrames 里做，
-不经过出图、出视频和剪辑那几个技能。第二次停下是**试听选声和定配乐**：创作者存过「我的音色」就先问他用不用；
+`$short-drama-write`，写法见 [口播稿写法](references/voiceover-writing.md)，写完用
+`scripts/script_check.py` 和原片的台词比口气、查照搬。配音走 `$short-drama-produce` 的报价和确认，
+拼旁白、排画面、混音和渲染都用本技能自带的脚本，画面在本机用 HyperFrames 渲，不经过出图、出视频和剪辑那几个技能。
+第二次停下是**试听选声和定配乐**：创作者存过「我的音色」就先问他用不用；
 不用就从 58 个中文音色里按原片挑四个给他试听，听中的可以存起来以后复用。然后让他
 再听两首候选配乐（从技能附带的 Mixkit 免费曲库里按情绪挑，`scripts/fetch_music.py` 负责下载和定音量），
-选定了才配全片。
+选定了才配全片。配全片之前，先按他选定的音色估一遍全片时长：同一份稿，不同音色念出来能差两三成，
+超出原片就先删稿，不要等花钱配完才发现片子拖长了。
 
 **剧情和实拍类**：方案定稿后补全逐镜对照和全片统一设定，然后照 [交接](references/handoff.md) 依次交给
 `$short-drama`（建项目、写节奏档案）、`$short-drama-write`、`$short-drama-assets`、
 `$short-drama-image-prompts`、`$short-drama-storyboard`、`$short-drama-video-prompts`、
 `$short-drama-produce`、`$short-drama-edit`。每份文档仍由它原来的技能写，本技能不越俎代庖。
 
-**第二次停下**在生产环节：每批图片和视频都先报价，创作者确认才花钱。这道闸门归
-`$short-drama-produce`，你不代他确认，也不为省事跳过。
+**第二次停下**在生产环节，而且不是一次：每张图、每段视频各有一张确认卡，创作者看过预览和价格、确认了才花钱。
+这道闸门归 `$short-drama-produce`，你不代他确认，也不为省事跳过。方案定稿时就告诉他大概要点几次
+（资产图几张 + 首帧几张 + 视频几段），以及中间还会问他两件事：用哪个视频模型，图怎么来。顺序和每一步问什么，
+都在交接文档开头那张表里。
 
 ### 6. 成片对照，第三次停下
 
-成片出来后先让脚本量一遍，和原片比：
+成片出来后先让脚本量一遍，和原片比。有人说话的片子先识别一遍成片的台词，不然语速那一项没法比：
 
 ```bash
+python3 <本技能目录>/scripts/transcribe.py <成片.mp4>
 python3 <本技能目录>/scripts/media_profile.py <成片.mp4> --compare <参考片目录>/source.profile.json
 ```
 
-它会逐项说通过还是不通过：画面有没有长时间不动、开头三秒动没动、有没有冷场、原片垫了配乐新片有没有垫、
-音量够不够、语速拖不拖。不通过的项先自己修；修不了的写清原因。再按复刻尺度里的「成片对照检查」
+它会逐项说通过还是不通过：时长差没差出一成、画面有没有长时间不动、开头三秒动没动、有没有冷场、原片垫了配乐
+新片有没有垫、音量够不够、语速拖不拖。不通过的项先自己修；修不了的写清原因。写「提示」的项不拦，但要原样
+告诉创作者（比如比原片轻了多少）。再按复刻尺度里的「成片对照检查」
 把新片和原片并排对一遍，写进 `复刻方案.md` 最后一节，和成片一起交给创作者，附一句「这条照原片学了
 哪几招」。不通过的项，只把那一段交回负责的技能重做。
 
@@ -154,15 +208,15 @@ Start-Process explorer.exe -ArgumentList ('/select,"' + $video + '"')
    不要写成 `explorer.exe /select,"$video"`。PowerShell 会把引号转义坏，结果打开的是「文档」文件夹。
    macOS 用 `open -R "<成片的完整路径>"`。
 
-## 识别台词（可选）
+## 识别台词
 
 ```bash
 python3 <本技能目录>/scripts/transcribe.py <参考片目录>/source.mp4
 ```
 
 它用 faster-whisper 在本机识别（CPU、INT8、默认 `small` 模型），结果写成同目录的
-`transcript.json` 和 `transcript.txt`。纯音乐段容易幻听出「请点赞订阅」这类话，脚本会标成「存疑」，
-以画面为准。
+`transcript.json` 和 `transcript.txt`，混进来的繁体字会转成简体。纯音乐段容易幻听出「请点赞订阅」
+这类话，脚本会标成「存疑」，以画面为准。
 
 脚本说 `need_setup` 时，问创作者要不要装：第一次要下载几百 MB（程序加模型），装一次以后都能用。
 他同意就建一个独立环境，不装进系统 Python：
@@ -172,10 +226,12 @@ python3 -m venv ~/.drama-skills/asr-venv
 ~/.drama-skills/asr-venv/bin/pip install faster-whisper      # Windows：~/.drama-skills/asr-venv/Scripts/pip
 ```
 
-以后用这个环境里的 Python 运行 `transcribe.py`。在国内下载模型很慢或失败时，运行前设
+装好以后还是照上面那条命令跑：脚本发现识别程序装在这个环境里，会自己换过去，不用你改用哪个 Python。
+体检说「已装」就是装好了，不要再问创作者。在国内下载模型很慢或失败时，运行前设
 `HF_ENDPOINT=https://hf-mirror.com` 走镜像。他不想装就跳过，台词改读画面字幕。
 
-口播多的片子（讲解、科普、财经）建议装：新稿该写多少字，要按原片的语速算，语速要靠识别结果才量得准。
+原片有人说话就建议装，问的时候把不装的代价讲清：新稿的口气像不像原片、有没有照搬原句、每段该写多少字，
+都要靠识别出来的台词去比；不装，这几项检查会直说没法比。
 跑完识别再跑一次 `media_profile.py`，语速就会进 `source.profile.json`。
 
 ## 守则
@@ -190,13 +246,23 @@ python3 -m venv ~/.drama-skills/asr-venv
 
 - [拆解方法](references/analysis-framework.md)：事实和推测怎么分、钩子两条线、结构和节奏数字、三层拆开、能仿几成
 - [复刻尺度](references/remake-policy.md)：中度和大胆两档、写新内容的规矩、成片对照检查
+- [口播稿写法](references/voiceover-writing.md)：照原片的口气写新稿、观点默认照原片讲、写完怎么查；
+  配套 [写稿检查](scripts/script_check.py)（口气、照搬、时长、每段字数）和
+  [音色语速](scripts/voice_pace.py)（估一个音色念完要多久，记下每个音色的实测语速）
 - [报告模板](references/report-templates.md)：拆解报告、复刻方案、第一个停顿点的三条路
 - [交接](references/handoff.md)：剧情和实拍类：建项目、节奏档案、交给各技能的顺序和要点
 - [图文动效路线](references/motion-graphics-route.md)：K 线、图表、文字讲解类怎么写稿、试听选声、定配乐、
-  用 HyperFrames 做动画、混音和检查；附 [K 线起步模板](assets/kline-starter/index.html)、
-  [免费配乐清单](references/music-catalog.json) 和配乐脚本 [fetch_music.py](scripts/fetch_music.py)
+  拼旁白、搭画面、混音和检查。配套脚本：[拼旁白出时间表](scripts/voice_track.py)、
+  [装动画工具、排画面、对词、截图、渲染](scripts/animation.py)、[混音](scripts/mix_audio.py)、
+  [配乐](scripts/fetch_music.py) 和 [免费配乐清单](references/music-catalog.json)；
+  画面模板在 [assets/motion-kit](assets/motion-kit/film.example.json)，横屏竖屏通用
+- [画面清单怎么写](references/film-json.md)：`film.json` 的每种画面、每个字段、时间的写法和常见毛病
+- [风格库](references/styles.md)：15 种动态设计风格（扁平矢量、线条、等轴、玻璃拟态……）；原片本身是这种画风、
+  新片题材也合适才用，怎么认、怎么讲、怎么照着画；提示词和样片源码在 `assets/styles`
+- [体检脚本](scripts/doctor.py)：一次查清这台电脑还缺什么
 - [抖音：用你自己的浏览器取作品详情](references/douyin-in-browser.md)
-- [拉片工具使用说明](vendor/video-shots/guide.md)：随技能附带，来源见同目录 `ATTRIBUTION.md`
+- [拉片工具使用说明](vendor/video-shots/guide.md)：随技能附带，来源见同目录 `ATTRIBUTION.md`；
+  [存拉片结果的脚本](scripts/shots.py)：代替那份说明里的 `>`，在哪种命令行里都存得对
 - [方案网页预览脚本](scripts/plan_preview.py)：把复刻方案和拆解报告排成一页网页
 - [中文音色清单](references/voice-catalog.json) 和 [我的音色脚本](scripts/my_voices.py)：试听挑候选、存下听中的音色以后复用
 - [借鉴来源](references/credits.md)

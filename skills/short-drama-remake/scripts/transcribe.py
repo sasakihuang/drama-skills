@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Transcribe the reference video's speech on this computer (optional step).
 
-Uses faster-whisper on the CPU (INT8, model ``small`` by default) when it is
-importable from the Python running this script. When it is not installed the
-script says so and how to set it up; the analysis then reads burned-in
-subtitles from the frames instead, which most Douyin/Kuaishou/Xiaohongshu
-videos carry anyway.
+Uses faster-whisper on the CPU (INT8, model ``small`` by default). When the
+Python running this script does not have it but the environment set up for it
+does (``~/.drama-skills/asr-venv``), the script carries on there by itself, so
+the same command works whichever Python it is started with. When it is not
+installed at all the script says so and how to set it up; the analysis then
+reads burned-in subtitles from the frames instead, which most
+Douyin/Kuaishou/Xiaohongshu videos carry anyway.
 
 Outputs next to the source:
 
@@ -14,14 +16,16 @@ Outputs next to the source:
 
 Lines that speech recognition typically hallucinates over music-only audio
 ("请点赞订阅", "字幕由…提供" and similar) are kept but marked ``suspect``: a real
-call to action can say the same words, so the frames decide. The last stdout
-line is one JSON object.
+call to action can say the same words, so the frames decide. Recognition often
+mixes traditional characters into Mandarin speech; the text is folded to
+simplified before it is written. The last stdout line is one JSON object.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -29,7 +33,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, NoReturn, Optional
+
+import zh_text
 
 MINIMUM_PYTHON = (3, 9)
 
@@ -38,7 +44,25 @@ HALLUCINATION = re.compile(
 )
 
 
-def emit(ok: bool, **fields: Any) -> None:
+HANDED_OVER = "DRAMA_SKILLS_ASR_HANDED_OVER"
+
+
+def shared_home() -> Path:
+    return Path(os.environ.get("DRAMA_SKILLS_HOME") or Path.home() / ".drama-skills")
+
+
+def recogniser_python(home: Path, running: Path) -> Optional[Path]:
+    """The Python of the environment the recogniser was installed into, when there is one and this is not it."""
+    own = home / "asr-venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if not own.is_file():
+        return None
+    try:
+        return None if own.resolve() == running.resolve() else own
+    except OSError:
+        return own
+
+
+def emit(ok: bool, **fields: Any) -> NoReturn:
     print(json.dumps({"ok": ok, **fields}, ensure_ascii=False))
     sys.exit(0 if ok else 1)
 
@@ -79,9 +103,15 @@ def main() -> None:
     try:
         from faster_whisper import WhisperModel  # type: ignore
     except ImportError:
+        other = recogniser_python(shared_home(), Path(sys.executable))
+        if other is not None and not os.environ.get(HANDED_OVER):
+            # Installed once, in its own environment: carry on there instead of asking the creator again.
+            done = subprocess.run([str(other), "-B", str(Path(__file__).resolve()), *sys.argv[1:]],
+                                  env={**os.environ, HANDED_OVER: "1"}, check=False)
+            sys.exit(done.returncode)
         emit(False, need_setup=True,
-             error="这台电脑还没装本机识别台词的程序；不装也行，改读画面上的字幕",
-             setup="见 SKILL.md「识别台词（可选）」一节")
+             error="这台电脑还没装本机识别台词的程序；不装也能做，但口气和照搬没法和原片比",
+             setup="见 SKILL.md「识别台词」一节")
 
     started = time.time()
     with tempfile.TemporaryDirectory() as tmp:
@@ -94,7 +124,7 @@ def main() -> None:
         )
         kept: List[Dict[str, Any]] = []
         for segment in segments:
-            text = segment.text.strip()
+            text = zh_text.to_simplified(segment.text.strip())
             if not text:
                 continue
             item: Dict[str, Any] = {"start": round(segment.start, 2), "end": round(segment.end, 2), "text": text}

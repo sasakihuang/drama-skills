@@ -82,6 +82,24 @@ ALLOWED_PROVIDER_URLS = {
         "https://assets.mixkit.co/music/",
         "https://mixkit.co/license/#musicFree",
     },
+    # The package mirror the animation setup tries first when it installs the renderer:
+    # the default registry is slow or unreachable from mainland China.
+    "skills/short-drama-remake/scripts/animation.py": {
+        "https://registry.npmmirror.com",
+    },
+    # The style library's reference drawing code names the SVG namespace, an identifier the
+    # browser matches as text; nothing is fetched from it.
+    **{
+        f"skills/short-drama-remake/assets/styles/{name}": {"http://www.w3.org/2000/svg"}
+        for name in (
+            "01-flat-vector/index.html",
+            "02-line-art/film.js",
+            "02-line-art/index.html",
+            "08-morph/index.html",
+            "10-synthwave/index.html",
+            "19-paperclip/index.html",
+        )
+    },
     "skills/short-drama-video-prompts/references/minimax-h3.md": {
         "https://github.com/MiniMax-AI/MiniMax-H3/blob/main/skills/h3-prompt-writing/references/base-en.txt",
         "https://github.com/MiniMax-AI/MiniMax-H3/blob/main/skills/h3-prompt-writing/references/ref-en.txt",

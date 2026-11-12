@@ -1,7 +1,7 @@
 {
-  "name": "kline-starter",
+  "name": "motion-kit-runtime",
   "private": true,
-  "description": "K 线讲解动画起步模板：渲染工具、动画库、字体和音效都装在本地，渲染时不连外网。",
+  "description": "图文动效用的渲染工具、动画库和字体。全电脑装一份，在 ~/.drama-skills/hyperframes；版本钉死。",
   "dependencies": {
     "@fontsource/ma-shan-zheng": "5.3.0",
     "@fontsource/noto-sans-sc": "5.3.0",
