@@ -394,6 +394,19 @@ def profile_notes(project: Mapping[str, Any]) -> list[str]:
             f"model's native minimum of {shortest:g} seconds: most shots will need "
             "multi-shot containers, or the average must rise"
         )
+    # A one-take source averages twenty seconds a shot; no model makes a clip that
+    # long, and nothing said so until the storyboard stage ran into it.
+    longest = native.get("max") if isinstance(native, Mapping) else None
+    if (
+        isinstance(longest, (int, float))
+        and isinstance(average, (int, float))
+        and average > longest
+    ):
+        notes.append(
+            f"rhythm_profile.target_avg_shot_seconds {average:g} is above the target "
+            f"model's native maximum of {longest:g} seconds: most shots will have to be "
+            "split into several generations joined at visible seams, or the average must come down"
+        )
     block = project.get("format")
     pacing = block.get("pacing") if isinstance(block, Mapping) else None
     target = block.get("target_seconds_per_episode") if isinstance(block, Mapping) else None

@@ -27,6 +27,11 @@ Supported public parameters are `width` plus `height` (compiled to `size`), or `
 Transparent backgrounds are rejected because GPT Image 2 does not support them. The output extension selects `png`,
 `jpeg`, or `webp`.
 
+Price: the yoyo relay charges 0.40 yuan per picture (its price as given on 2026-11-12). `provider_adapters.py --quote`
+prices `gpt-image-2` jobs at that rate, `--price-table` lists it, and `--estimate ... --draw <n>` adds n pictures to
+every option. When `OPENAI_BASE_URL` points anywhere else, those outputs add a line saying the real price is that
+relay's.
+
 Protocol references: [GPT Image 2 model](https://developers.openai.com/api/docs/models/gpt-image-2),
 [image generation](https://developers.openai.com/api/reference/resources/images/methods/generate), and
 [image edits](https://developers.openai.com/api/reference/resources/images/methods/edit).

@@ -91,6 +91,12 @@ MINIMAX_PRICE_CHECKED = "2026-10-20"
 MINIMAX_INPUT_FEE_SOURCE = "https://platform.minimax.cn/docs/pricing/overview"
 MINIMAX_INPUT_FEE_CHECKED = "2026-10-22"
 MINIMAX_IMAGE_ROLES = frozenset({"first_frame", "last_frame", "reference_image"})
+# A gpt-image-2 picture through the yoyo relay, which the credentials template
+# points OPENAI_BASE_URL at. The relay charges per picture; its operator gave
+# this price on the date below.
+GPT_IMAGE_PRICE = 0.40
+GPT_IMAGE_PRICE_CHECKED = "2026-11-12"
+GPT_IMAGE_RELAY_HOST = "api.yoyochatai.com"
 MINIMAX_MODE_LABELS = {
     "text": "文生视频",
     "first_frame": "首帧图生",
@@ -849,6 +855,60 @@ def minimax_job_price(model: str, job: Mapping[str, Any]) -> tuple[float, str]:
     if videos and MINIMAX_VIDEO_MODELS[model]["api"] == "v2":
         notes.append("参考视频按输入时长另收费，未算入")
     return round(price + fee, 2), "；".join(notes)
+
+
+# What each reference becomes on its way to MiniMax, minus the file: enough for a
+# dry compile to check roles, frames and parameters without reading any bytes.
+MINIMAX_STAND_IN_URLS = {
+    "image_url": "data:image/png;base64,AAAA",
+    "video_url": "data:video/mp4;base64,AAAA",
+    "audio_url": "data:audio/mpeg;base64,AAAA",
+}
+
+
+def check_minimax_video_job(job: Mapping[str, Any], model: str) -> None:
+    """Raise ValueError for a video job this model would refuse when it runs.
+
+    The job is compiled the way `run` compiles it, with stand-in data in place of
+    each reference file, so a role the model does not take (a character picture
+    on a Hailuo job), a missing start frame, an overlong prompt or a duration the
+    model does not offer is refused before anyone is asked to confirm it. The
+    files themselves are read only when the job runs.
+    """
+    entry = MINIMAX_VIDEO_MODELS.get(model)
+    if entry is None:
+        raise ValueError(f"{model} is not in the built-in MiniMax catalog")
+    hailuo = entry["api"] == "v1"
+    allowed = MINIMAX_HAILUO_ROLES if hailuo else MINIMAX_VIDEO_ROLES
+    references = job.get("references") or []
+    roles: list[str] = []
+    if references:
+        try:
+            roles = _binding_roles(job, allowed=allowed, provider=model)
+        except AdapterFailure as exc:
+            raise ValueError(str(exc)) from exc
+    for reference, role in zip(references, roles):
+        name = Path(str(reference)).name
+        mime = INLINE_REFERENCE_MIME.get(Path(name).suffix.casefold(), "")
+        if not mime.startswith(allowed[role].split("_", 1)[0]):
+            raise ValueError(f"{model} {role} does not accept {name}")
+    urls = [MINIMAX_STAND_IN_URLS[allowed[role]] for role in roles]
+    if hailuo:
+        compile_minimax_hailuo_payload(job, model=model, reference_urls=urls, reference_roles=roles)
+        return
+    try:
+        ratios, resolutions, duration_range = _minimax_video_runtime_profile(model)
+    except AdapterFailure as exc:
+        raise ValueError(str(exc)) from exc
+    compile_minimax_h3_payload(
+        job,
+        model=model,
+        reference_urls=urls,
+        reference_roles=roles,
+        allowed_ratios=ratios,
+        allowed_resolutions=resolutions,
+        duration_range=duration_range,
+    )
 
 
 def compile_minimax_hailuo_payload(
@@ -2155,7 +2215,12 @@ def price_table() -> str:
         + "。",
         "",
         input_fee_note(),
+        "",
+        f"出图用 gpt-image-2，走 yoyo 中转：每张 {GPT_IMAGE_PRICE:.2f} 元（{GPT_IMAGE_PRICE_CHECKED} 按中转站的定价）。",
     ]
+    relay = image_relay_note()
+    if relay:
+        lines.append(relay)
     if _minimax_region_or_default() == "global":
         lines.append("你配置的是国际站（MINIMAX_REGION=global），国际站按美元另行计价，上表只作对比参考。")
     return "\n".join(lines)
@@ -2179,18 +2244,38 @@ def input_fee_note() -> str:
     )
 
 
-def estimate_table(durations: Sequence[int], *, images: int = 0) -> str:
-    """Official total for a planned set of clips, per model and resolution.
+def gpt_image_price(count: int) -> float:
+    """What `count` gpt-image-2 pictures cost through the yoyo relay."""
+    return round(GPT_IMAGE_PRICE * count, 2)
+
+
+def image_relay_note() -> str:
+    """A caution when pictures are drawn somewhere other than the yoyo relay; empty otherwise."""
+    host = urllib.parse.urlparse(os.environ.get("OPENAI_BASE_URL", "")).hostname
+    if host == GPT_IMAGE_RELAY_HOST:
+        return ""
+    if host:
+        return f"注意：你配的出图中转是 {host}，不是 yoyo；图片按 yoyo 中转价估，实际以那边为准。"
+    return "注意：你没配出图中转（OPENAI_BASE_URL），会直连 OpenAI 官方、按美元扣费；图片按 yoyo 中转价估，实际以那边为准。"
+
+
+def estimate_table(durations: Sequence[int], *, images: int = 0, draw: int = 0) -> str:
+    """Total for a planned set of clips, per model and resolution.
 
     Used to ask the creator to pick a video model before any job exists, so each
     option can carry what this film would cost with it. `images` is how many
     images each clip sends (first frame and references); H3-series fees past the
-    free allowance are added per clip.
+    free allowance are added per clip. `draw` is how many pictures the film needs
+    drawn first (asset boards and first frames): they cost the same whichever
+    video model is picked, and are added to every option at the yoyo relay's price.
     """
     if not durations or any(isinstance(d, bool) or not isinstance(d, int) or d < 1 for d in durations):
         raise ValueError("--estimate takes one positive whole number of seconds per planned clip")
     if isinstance(images, bool) or not isinstance(images, int) or images < 0:
         raise ValueError("--images takes a whole number of images sent with each clip")
+    if isinstance(draw, bool) or not isinstance(draw, int) or draw < 0:
+        raise ValueError("--draw takes a whole number of pictures to draw")
+    pictures = gpt_image_price(draw)
     plan = "、".join(str(d) for d in durations)
     rows: list[tuple[float, str]] = []
     missing: list[str] = []
@@ -2204,7 +2289,8 @@ def estimate_table(durations: Sequence[int], *, images: int = 0) -> str:
             try:
                 total = round(
                     sum(minimax_video_price(model, resolution, d) for d in durations)
-                    + minimax_image_fee(model, images) * len(durations),
+                    + minimax_image_fee(model, images) * len(durations)
+                    + pictures,
                     2,
                 )
             except ValueError:
@@ -2214,8 +2300,10 @@ def estimate_table(durations: Sequence[int], *, images: int = 0) -> str:
                 (total, f"| {model} | `{entry['profile']}` | {resolution} | {_yuan(total)} | {entry['summary']} |")
             )
     sent = f"，每段带 {images} 张输入图" if images else ""
+    drawn = f"，另出 {draw} 张图" if draw else ""
+    priced = "估算（视频按官方价，图片按 yoyo 中转价）" if draw else "估算官方价"
     lines = [
-        f"按计划的 {len(durations)} 段视频（{plan} 秒，共 {sum(durations)} 秒{sent}）估算官方价，从便宜到贵：",
+        f"按计划的 {len(durations)} 段视频（{plan} 秒，共 {sum(durations)} 秒{sent}{drawn}）{priced}，从便宜到贵：",
         "",
         "| 模型 | 配置档名 | 分辨率 | 这条片子合计 | 特点 |",
         "|---|---|---|---|---|",
@@ -2225,7 +2313,28 @@ def estimate_table(durations: Sequence[int], *, images: int = 0) -> str:
         lines += ["", "这些组合没有计划里的时长，要用就得改镜长：" + "；".join(missing) + "。"]
     if not images:
         lines += ["", "上面没算输入图费；每段要带首帧和参考图时，加 `--images <每段张数>` 重算。"]
+    elif images > 1:
+        lines += [
+            "",
+            f"每段带 {images} 张图时要看是哪几张：Hailuo 系列只收起始帧（Hailuo-02 另收一张结束帧），"
+            "不收人物、场景、道具参考图；要挂参考图只能选 H3 系列。",
+        ]
+    if draw:
+        lines += [
+            "",
+            f"合计里含出图 {draw} 张：yoyo 中转价每张 {GPT_IMAGE_PRICE:.2f} 元，共 {_yuan(pictures)}，"
+            "选哪个视频模型都一样。",
+        ]
+    else:
+        lines += [
+            "",
+            "上面没算出图的钱：资产图和首帧一共要出几张，加 `--draw <张数>` 重算，"
+            f"每张按 yoyo 中转价 {GPT_IMAGE_PRICE:.2f} 元算进合计。",
+        ]
     lines += ["", input_fee_note(), "订阅套餐也按这个价格折算扣用量；这里只列价格。"]
+    relay = image_relay_note() if draw else ""
+    if relay:
+        lines.append(relay)
     return "\n".join(lines)
 
 
@@ -2253,23 +2362,70 @@ def _profile_models(config_path: Path | None) -> dict[str, str]:
     return mapping
 
 
+def _image_profiles(config_path: Path | None) -> set[str]:
+    """Adapter profiles that run the built-in gpt-image-2 adapter."""
+    names = {OPENAI_MODEL}
+    if config_path is None or not config_path.is_file():
+        return names
+    try:
+        document = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return names
+    adapters = document.get("adapters") if isinstance(document, Mapping) else None
+    if not isinstance(adapters, Mapping):
+        return names
+    for profile, selected in adapters.items():
+        command = selected.get("command") if isinstance(selected, Mapping) else None
+        if isinstance(command, list) and command and command[-1] == OPENAI_MODEL:
+            names.add(str(profile))
+    return names
+
+
+def _picture_size(parameters: Mapping[str, Any]) -> str:
+    width, height = parameters.get("width"), parameters.get("height")
+    if isinstance(width, int) and isinstance(height, int):
+        return f"{width}×{height}"
+    size = parameters.get("size")
+    return size if isinstance(size, str) and size else "默认"
+
+
 def quote_jobs(job_files: Sequence[Path], *, model: str | None, config_path: Path | None) -> str:
-    """Official-price estimate of prepared video jobs, before anything is spent."""
+    """What prepared video and picture jobs will cost, before anything is spent.
+
+    Videos at MiniMax's official list price, input fees included; pictures from
+    the built-in gpt-image-2 adapter at the yoyo relay's price. Speech and music
+    jobs are listed without a price.
+    """
     profiles = _profile_models(config_path)
+    drawing = _image_profiles(config_path)
     lines = [
-        "| 任务 | 模型 | 分辨率 | 时长 | 官方价 |",
+        "| 任务 | 模型 | 分辨率或尺寸 | 时长或张数 | 价格 |",
         "|---|---|---|---|---|",
     ]
-    total = 0.0
+    video_total = 0.0
     seconds = 0
     counted = 0
+    pictures = 0
+    picture_total = 0.0
+    unpriced = 0
     for job_file in job_files:
         job = json.loads(Path(job_file).read_text(encoding="utf-8"))
         if not isinstance(job, Mapping):
             raise ValueError(f"{job_file} is not a job object")
         job_id = job.get("job_id", Path(job_file).stem)
+        given = job.get("parameters")
+        parameters: Mapping[str, Any] = given if isinstance(given, Mapping) else {}
+        if job.get("modality") == "image" and str(job.get("adapter")) in drawing:
+            outputs = job.get("outputs")
+            count = len(outputs) if isinstance(outputs, list) and outputs else 1
+            price = gpt_image_price(count)
+            pictures += count
+            picture_total += price
+            lines.append(f"| {job_id} | {OPENAI_MODEL} | {_picture_size(parameters)} | {count} 张 | {_yuan(price)} |")
+            continue
         if job.get("modality") != "video":
-            lines.append(f"| {job_id} | — | — | — | 不是视频任务，不计价 |")
+            unpriced += 1
+            lines.append(f"| {job_id} | — | — | — | 这类任务不报价 |")
             continue
         chosen = model or profiles.get(str(job.get("adapter")))
         if chosen is None:
@@ -2277,20 +2433,32 @@ def quote_jobs(job_files: Sequence[Path], *, model: str | None, config_path: Pat
                 f"{job_id}: adapter profile {job.get('adapter')!r} is not a known MiniMax "
                 "video model; pass --model"
             )
-        parameters = job.get("parameters") if isinstance(job.get("parameters"), Mapping) else {}
         resolution = str(parameters.get("resolution", ""))
         duration = parameters.get("duration")
         price, note = minimax_job_price(chosen, job)
-        total += price
+        video_total += price
         seconds += duration
         counted += 1
         shown = _yuan(price) + (f"（{note}）" if note else "")
         lines.append(f"| {job_id} | {chosen} | {resolution} | {duration} 秒 | {shown} |")
-    lines += [
-        "",
-        f"合计 {counted} 段视频、{seconds} 秒，按官方价约 {_yuan(round(total, 2))}"
-        "（含 H3 系列输入图费；订阅套餐按这个价格折算扣用量）。",
-    ]
+    parts = []
+    if counted:
+        parts.append(
+            f"视频 {counted} 段、{seconds} 秒，官方价 {_yuan(round(video_total, 2))}"
+            "（含 H3 系列输入图费；订阅套餐按这个价格折算扣用量）"
+        )
+    if pictures:
+        parts.append(
+            f"图片 {pictures} 张，yoyo 中转价每张 {GPT_IMAGE_PRICE:.2f} 元，共 {_yuan(round(picture_total, 2))}"
+        )
+    lines.append("")
+    if parts:
+        lines.append(f"合计约 {_yuan(round(video_total + picture_total, 2))}：" + "；".join(parts) + "。")
+    if unpriced:
+        lines.append(f"另有 {unpriced} 个配音、音乐之类的任务，这里不报价。")
+    relay = image_relay_note() if pictures else ""
+    if relay:
+        lines.append(relay)
     return "\n".join(lines)
 
 
@@ -2504,7 +2672,7 @@ def main() -> int:
         "--price-table", action="store_true", help="print official MiniMax video prices"
     )
     parser.add_argument(
-        "--quote", nargs="+", type=Path, metavar="JOB", help="price prepared video job files"
+        "--quote", nargs="+", type=Path, metavar="JOB", help="price prepared video and picture job files"
     )
     parser.add_argument(
         "--estimate",
@@ -2519,6 +2687,13 @@ def main() -> int:
         default=0,
         metavar="N",
         help="with --estimate: images each clip sends (first frame and references)",
+    )
+    parser.add_argument(
+        "--draw",
+        type=int,
+        default=0,
+        metavar="N",
+        help="with --estimate: pictures to draw first (asset boards and first frames)",
     )
     parser.add_argument(
         "--adapter-config",
@@ -2562,7 +2737,7 @@ def main() -> int:
             if args.price_table:
                 print(price_table())
             if args.estimate:
-                print(estimate_table(args.estimate, images=args.images))
+                print(estimate_table(args.estimate, images=args.images, draw=args.draw))
             if args.quote:
                 print(quote_jobs(args.quote, model=args.model, config_path=args.adapter_config))
         except (OSError, ValueError, json.JSONDecodeError) as exc:

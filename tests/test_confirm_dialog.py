@@ -37,7 +37,7 @@ class DialogConfirmationTests(unittest.TestCase):
                 {
                     "job_id": "VID-DIALOG",
                     "modality": "video",
-                    "adapter": "minimax-hailuo-2.3-fast",
+                    "adapter": "minimax-h3",
                     "prompt": "[固定] 小黑猫抬头看星星，尾巴轻轻摆动。",
                     "outputs": ["剧集/EP001/制作成果/video/dialog.mp4"],
                     "parameters": {"duration": 6, "resolution": "768P", "ratio": "9:16"},
@@ -64,8 +64,8 @@ class DialogConfirmationTests(unittest.TestCase):
         self.assertTrue(self.receipt.is_file())
         # The creator sees the job and its price before clicking.
         self.assertIn("VID-DIALOG", shown[0])
-        self.assertIn("minimax-hailuo-2.3-fast", shown[0])
-        self.assertIn("1.35 元", shown[0])
+        self.assertIn("minimax-h3", shown[0])
+        self.assertIn("3.00 元", shown[0])
         self.assertIn("小黑猫抬头看星星", shown[0])
 
     def test_no_and_no_dialog_leave_the_job_unconfirmed(self) -> None:
@@ -93,13 +93,15 @@ class DialogConfirmationTests(unittest.TestCase):
                 ["confirm", str(self.root), "--job-id", "VID-DIALOG", "--dialog", "--confirmation", "x"]
             )
 
-    def test_an_image_job_says_its_price_is_not_estimated(self) -> None:
+    def test_an_image_job_shows_the_relay_price(self) -> None:
         job = {
             "job_id": "IMG-1", "modality": "image", "adapter": "gpt-image-2", "prompt": "猫",
             "outputs": ["a.png"], "parameters": {"width": 864, "height": 1536},
             "reference_bindings": [],
         }
-        self.assertIn("本工具不估算", production_tool._dialog_message(job))
+        self.assertIn("yoyo 中转价 0.40 元", production_tool._dialog_message(job))
+        other = {**job, "adapter": "studio-image"}
+        self.assertIn("本工具不估算", production_tool._dialog_message(other))
 
 
 if __name__ == "__main__":

@@ -45,7 +45,9 @@ video and tail-frame inputs; do not omit the source selector to bypass this boun
   `### 冻结关键帧提示词` body rather than `### 可复制提示词`). A new image/video job using one of these canonical sources must
   provide the matching selector; an arbitrary Markdown file cannot impersonate a
   creator source. `prepare` selects that section and requires `prompt` to exactly
-  equal its copyable prompt after Markdown quote markers are removed.
+  equal its copyable prompt after Markdown quote markers are removed. `prompt` may be
+  left out of such a job: `prepare` then takes that copyable prompt itself, so a long
+  body is never retyped.
 - `reference_bindings`: zero to sixteen ordered semantic bindings. Every entry has
   `slot_id`, contiguous `order`, project-relative `path`, Chinese `label`,
   non-empty `role`, and non-empty `may_control` / `must_not_control` lists. When
@@ -122,6 +124,10 @@ A profile may add `"reference_roles": [...]`, the roles its configured model acc
 that declaration, so an unsupported model cannot silently drop a voice. A role rejection happens
 before confirmation is consumed or the adapter starts. List `reference_audio` only for a model
 known to accept reference audio.
+
+For a profile that runs a built-in MiniMax model, `prepare` already compiles the job the way the
+adapter will, with stand-in data in place of each file, and refuses a role, frame, duration or
+resolution that model cannot take, so the creator is never asked to confirm a job that cannot run.
 
 ## Capability sources
 

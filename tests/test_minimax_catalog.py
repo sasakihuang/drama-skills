@@ -481,14 +481,17 @@ class PriceTests(unittest.TestCase):
             config.write_text(json.dumps({"adapters": {"my-fast": {
                 "command": ["python", "x.py", "minimax-video", "--model", "MiniMax-Hailuo-2.3-Fast"]
             }}}), encoding="utf-8")
-            quote = provider_adapters.quote_jobs(
-                [root / name for name in jobs], model=None, config_path=config
-            )
+            with isolated(OPENAI_BASE_URL="https://api.yoyochatai.com/v1"):
+                quote = provider_adapters.quote_jobs(
+                    [root / name for name in jobs], model=None, config_path=config
+                )
             self.assertIn("| SHOT-1 | MiniMax-H3 | 768P | 6 秒 | 3.00 元 |", quote)
             self.assertIn("| SHOT-2 | MiniMax-Hailuo-2.3-Fast | 768P | 10 秒 | 2.25 元 |", quote)
             self.assertIn("| SHOT-3 | MiniMax-Hailuo-2.3-Fast | 1080P | 6 秒 | 2.31 元 |", quote)
-            self.assertIn("IMG-1", quote)
-            self.assertIn("合计 3 段视频、22 秒，按官方价约 7.56 元", quote)
+            self.assertIn("| IMG-1 | gpt-image-2 | 默认 | 1 张 | 0.40 元 |", quote)
+            self.assertIn("合计约 7.96 元：视频 3 段、22 秒，官方价 7.56 元", quote)
+            self.assertIn("图片 1 张，yoyo 中转价每张 0.40 元，共 0.40 元", quote)
+            self.assertNotIn("注意", quote)
             forced = provider_adapters.quote_jobs(
                 [root / "a.json"], model="MiniMax-H3-Max", config_path=None
             )
@@ -496,6 +499,102 @@ class PriceTests(unittest.TestCase):
             (root / "e.json").write_text(json.dumps({**jobs["a.json"], "adapter": "mystery"}), encoding="utf-8")
             with self.assertRaises(ValueError):
                 provider_adapters.quote_jobs([root / "e.json"], model=None, config_path=None)
+
+
+    def test_pictures_are_priced_at_the_yoyo_relay_rate(self) -> None:
+        # A rehearsal's quote listed nine pictures as 「不计价」 and totalled
+        # 0.00 yuan; every one of them is a paid call through the relay.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            jobs = {
+                "board.json": {"job_id": "IMG-BOARD", "modality": "image", "adapter": "gpt-image-2",
+                               "outputs": ["制作成果/images/board.png"],
+                               "parameters": {"width": 1536, "height": 1024}},
+                "frame.json": {"job_id": "SHOT-1-frame", "modality": "image", "adapter": "my-draw",
+                               "outputs": ["制作成果/images/frame.png"], "parameters": {"size": "864x1536"}},
+                "voice.json": {"job_id": "LINE-1", "modality": "tts", "adapter": "minimax-speech"},
+            }
+            for name, job in jobs.items():
+                (root / name).write_text(json.dumps(job), encoding="utf-8")
+            config = root / "adapters.json"
+            config.write_text(json.dumps({"adapters": {"my-draw": {
+                "command": ["python", "x.py", "gpt-image-2"]
+            }}}), encoding="utf-8")
+            files = [root / name for name in jobs]
+            with isolated(OPENAI_BASE_URL="https://api.yoyochatai.com/v1"):
+                quote = provider_adapters.quote_jobs(files, model=None, config_path=config)
+            self.assertIn("| IMG-BOARD | gpt-image-2 | 1536×1024 | 1 张 | 0.40 元 |", quote)
+            self.assertIn("| SHOT-1-frame | gpt-image-2 | 864x1536 | 1 张 | 0.40 元 |", quote)
+            self.assertIn("合计约 0.80 元：图片 2 张，yoyo 中转价每张 0.40 元，共 0.80 元。", quote)
+            self.assertIn("另有 1 个配音、音乐之类的任务，这里不报价。", quote)
+            self.assertNotIn("0.00 元", quote)
+            # Another relay, or none, draws at its own price; the quote says so.
+            board = [root / "board.json"]
+            with isolated(OPENAI_BASE_URL="https://relay.example.test/v1"):
+                elsewhere = provider_adapters.quote_jobs(board, model=None, config_path=config)
+            self.assertIn("relay.example.test", elsewhere)
+            with isolated():
+                direct = provider_adapters.quote_jobs(board, model=None, config_path=config)
+            self.assertIn("直连 OpenAI", direct)
+        with isolated():
+            self.assertIn("每张 0.40 元", provider_adapters.price_table())
+
+    def test_the_estimate_can_carry_the_pictures_to_draw(self) -> None:
+        with isolated(OPENAI_BASE_URL="https://api.yoyochatai.com/v1"):
+            plain = provider_adapters.estimate_table([10, 10, 10])
+            drawn = provider_adapters.estimate_table([10, 10, 10], draw=9)
+        self.assertIn("--draw", plain)
+        self.assertIn("另出 9 张图", drawn)
+        # 6.75 yuan of video and nine pictures at 0.40 yuan, on every option.
+        self.assertIn("| MiniMax-Hailuo-2.3-Fast | `minimax-hailuo-2.3-fast` | 768P | 10.35 元 |", drawn)
+        self.assertIn("| MiniMax-H3 | `minimax-h3` | 2K | 27.60 元 |", drawn)
+        self.assertIn("共 3.60 元", drawn)
+        self.assertNotIn("注意", drawn)
+        for bad in (-1, True, 1.5):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                provider_adapters.estimate_table([10], draw=bad)  # type: ignore[arg-type]
+
+    def test_the_estimate_says_hailuo_cannot_take_reference_pictures(self) -> None:
+        self.assertIn("要挂参考图只能选 H3 系列", provider_adapters.estimate_table([6, 6], images=3))
+        self.assertNotIn("要挂参考图只能选 H3 系列", provider_adapters.estimate_table([6, 6], images=1))
+
+
+class DryCheckTests(unittest.TestCase):
+    """A job the model would refuse at `run` is refused before anyone confirms it."""
+
+    def check(self, model: str, job: dict) -> None:
+        with isolated():
+            provider_adapters.check_minimax_video_job(job, model)
+
+    def test_hailuo_takes_frames_only(self) -> None:
+        character = video_job(
+            references=["start.png", "hero.png"], roles=["first_frame", "reference_image"],
+            duration=6, resolution="512P",
+        )
+        with self.assertRaisesRegex(ValueError, "reference_image"):
+            self.check("MiniMax-Hailuo-02", character)
+        self.check("MiniMax-Hailuo-02", video_job(
+            references=["start.png"], roles=["first_frame"], duration=6, resolution="512P"))
+        # H3 takes the same two pictures as references.
+        self.check("MiniMax-H3", video_job(
+            references=["start.png", "hero.png"], roles=["reference_image", "reference_image"],
+            duration=6, resolution="768P"))
+
+    def test_other_refusals_at_run_surface_too(self) -> None:
+        cases = {
+            "Fast without a start frame": ("MiniMax-Hailuo-2.3-Fast", video_job(duration=6, resolution="768P")),
+            "512P with an end frame": ("MiniMax-Hailuo-02", video_job(
+                references=["a.png", "b.png"], roles=["first_frame", "last_frame"], duration=6, resolution="512P")),
+            "a picture bound as a video": ("MiniMax-H3", video_job(
+                references=["a.png"], roles=["reference_video"], duration=6, resolution="768P")),
+            "a length the model lacks": ("MiniMax-H3", video_job(
+                references=["a.png"], roles=["first_frame"], duration=20, resolution="768P")),
+            "a picture with no role": ("MiniMax-H3", {**video_job(duration=6, resolution="768P"),
+                                                      "references": ["a.png"]}),
+        }
+        for name, (model, job) in cases.items():
+            with self.subTest(name), self.assertRaises(ValueError):
+                self.check(model, job)
 
 
 class CredentialsFileTests(unittest.TestCase):

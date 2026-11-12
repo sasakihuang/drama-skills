@@ -228,6 +228,67 @@ class ConfirmedProductionTests(unittest.TestCase):
         )
         return preview
 
+    def test_a_creator_job_may_leave_its_prompt_to_the_source_entry(self) -> None:
+        # Copying a long body into the job by hand is where one character
+        # drifts; a rehearsal wrote its own script for it. The entry is enough.
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            job = self.write_creator_image_job(root)
+            document = json.loads(job.read_text(encoding="utf-8"))
+            del document["prompt"]
+            job.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+            preview = production_tool.prepare_job(root, job)
+            self.assertEqual(
+                preview["prompt"], "A young East Asian woman stands beside a rain-dark door."
+            )
+            # With no entry to read it from, the prompt is still required.
+            plain = self.write_job(root)
+            document = json.loads(plain.read_text(encoding="utf-8"))
+            del document["prompt"]
+            plain.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "prompt must be non-empty"):
+                production_tool.prepare_job(root, plain)
+
+    def test_prepare_refuses_a_video_job_the_built_in_model_would_refuse(self) -> None:
+        # A rehearsal bound a character picture to a Hailuo shot. The document
+        # check, prepare and the quote all passed; only `run`, after the
+        # creator's click, would have refused it.
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_project(directory)
+            (root / "输入/start.png").write_bytes(b"start")
+
+            def binding(slot: str, order: int, path: str, role: str) -> dict:
+                return {
+                    "slot_id": slot, "order": order, "path": path,
+                    "label": "第一镜起始帧" if role == "first_frame" else "小彦定妆照",
+                    "role": role, "may_control": ["构图"], "must_not_control": ["动作"],
+                }
+
+            job = {
+                "schema_version": "1.0", "job_id": "EP001-HAILUO", "modality": "video",
+                "adapter": "minimax-hailuo-02", "prompt": "球滚进树洞。",
+                "reference_bindings": [
+                    binding("REF-START", 1, "输入/start.png", "first_frame"),
+                    binding("REF-HERO", 2, "输入/reference.png", "reference_image"),
+                ],
+                "outputs": ["剧集/EP001/制作成果/video/EP001-HAILUO.mp4"],
+                "parameters": {"duration": 6, "resolution": "512P"},
+            }
+            path = root / "hailuo-job.json"
+            path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "reference_image.*nothing was prepared"):
+                production_tool.prepare_job(root, path)
+            job["reference_bindings"] = job["reference_bindings"][:1]
+            path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(production_tool.prepare_job(root, path)["state"], "needs_confirmation")
+            # A job for an adapter this tool does not know is not second-guessed.
+            other = {
+                **job, "job_id": "EP001-OTHER", "adapter": "fixture", "parameters": {},
+                "outputs": ["剧集/EP001/制作成果/video/EP001-OTHER.mp4"],
+            }
+            path.write_text(json.dumps(other, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(production_tool.prepare_job(root, path)["state"], "needs_confirmation")
+
     def test_prepare_only_returns_a_complete_preview_and_creates_no_media(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_project(directory)

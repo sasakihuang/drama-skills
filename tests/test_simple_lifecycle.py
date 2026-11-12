@@ -819,6 +819,27 @@ class SimpleLifecycleTests(unittest.TestCase):
         self.assertEqual(len(project_tool.profile_notes(manifest(None))), 1)
         self.assertEqual(project_tool.profile_notes(manifest(True)), [])
 
+    def test_status_names_shots_longer_than_the_model_can_make(self) -> None:
+        # A one-take source averages twenty seconds a shot. No model makes a
+        # clip that long, and nothing said so until the storyboard ran into it.
+        rhythm = {
+            "status": "accepted", "form": "ai_live_action", "first_hook_seconds": 3,
+            "beat_interval_seconds_max": 8, "opposed_reversals_per_episode_min": 0,
+            "end_on_peak": True, "reprise_previous_last_beat": False, "vo_share_max": 1,
+            "target_avg_shot_seconds": 20.07, "close_shot_share_min": 0,
+            "first_major_payoff_by_episode": 1,
+        }
+        manifest = {"creator_authority": {
+            "production_profile": {"status": "accepted", "choices": {
+                "native_duration_seconds": {"min": 6, "max": 10}}},
+            "rhythm_profile": rhythm,
+        }}
+        notes = project_tool.profile_notes(manifest)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("native maximum of 10", notes[0])
+        rhythm["target_avg_shot_seconds"] = 10
+        self.assertEqual(project_tool.profile_notes(manifest), [])
+
     def test_pacing_with_zero_action_seconds_still_counts_as_declared(self) -> None:
         # The write stage's estimator accepts a zero action-paragraph duration;
         # status must not ask the creator to change a setting that works.

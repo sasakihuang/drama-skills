@@ -293,7 +293,7 @@ def _open_project_input(root: Path, relative: str) -> Iterator[BinaryIO]:
             raise ValueError(f"unsafe job input path: {relative}")
     if not path.resolve().is_relative_to(root):
         raise ValueError(f"job input escapes project root: {relative}")
-    before = path.stat(follow_symlinks=False)
+    before = path.lstat()
     if not stat.S_ISREG(before.st_mode):
         raise ValueError(f"job input is not a regular file: {relative}")
     with path.open("rb") as handle:
@@ -480,7 +480,7 @@ def _metadata_atomic_json(
                     pass
             return
 
-        before = directory.stat(follow_symlinks=False)
+        before = directory.lstat()
         temporary = directory / temporary_name
         try:
             with temporary.open("xb") as handle:
@@ -959,6 +959,15 @@ def _markdown_audio_bindings(section: str) -> list[dict[str, Any]]:
     return bindings
 
 
+def _entry_prompt(root: Path, source: str, source_entry: str) -> str:
+    """The selected entry's copyable body, exactly as `prepare` compares it."""
+    source_path = _project_file(root, source)
+    if source_path.suffix.casefold() != ".md":
+        raise ValueError("source_entry requires a Markdown source")
+    section = _markdown_section(source_path.read_text(encoding="utf-8"), source_entry)
+    return _copyable_prompt(section, CREATOR_SOURCE_ENTRIES[source_path.name][1])
+
+
 def _verify_markdown_source(
     root: Path,
     *,
@@ -1033,8 +1042,12 @@ def _normalize_job(root: Path, raw: object) -> dict[str, Any]:
     adapter = raw.get("adapter")
     if not isinstance(adapter, str) or JOB_ID_RE.fullmatch(adapter) is None:
         raise ValueError("adapter must be a portable profile name")
+    # A job that names its source entry may leave the prompt out: it is that
+    # entry's copyable body, read below rather than retyped and compared.
     prompt = raw.get("prompt")
-    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 100_000:
+    if (prompt is not None or raw.get("source_entry") is None) and (
+        not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 100_000
+    ):
         raise ValueError("prompt must be non-empty and at most 100000 characters")
     source_raw = raw.get("source")
     source = _relative_path(source_raw) if source_raw is not None else None
@@ -1069,6 +1082,10 @@ def _normalize_job(root: Path, raw: object) -> dict[str, Any]:
         or not source_entry.startswith(expected_entry_prefix)
     ):
         raise ValueError("source_entry does not match the job modality")
+    if prompt is None:
+        prompt = _entry_prompt(root, str(source), str(source_entry))
+        if len(prompt) > 100_000:
+            raise ValueError("prompt must be non-empty and at most 100000 characters")
     references_supplied = "references" in raw
     supplied_references = [
         _relative_path(path)
@@ -1140,6 +1157,12 @@ def prepare_job(root: Path, job_file: Path) -> dict[str, Any]:
         raise ValueError("job file is too large")
     raw = json.loads(job_file.read_text(encoding="utf-8"))
     job = _normalize_job(root, raw)
+    refusal = _refusal_at_run(job)
+    if refusal is not None:
+        raise ValueError(
+            f"{refusal}. The model would refuse this job when it runs, so nothing was "
+            "prepared: change the job's references or parameters, or pick another model"
+        )
     with _project_lock(root):
         if _active_run(root, str(job["job_id"])) is not None:
             raise RuntimeError("this job is already running")
@@ -1335,10 +1358,8 @@ def confirm_job(root: Path, *, job_id: str, confirmation: str) -> dict[str, Any]
 MODALITY_NAMES = {"image": "图片", "video": "视频", "tts": "配音", "music": "音乐"}
 
 
-def _price_line(job: Mapping[str, Any]) -> str:
-    """Official price of a built-in MiniMax video job, from the sibling adapter."""
-    if job["modality"] != "video":
-        return "按所用服务商的价格计费，本工具不估算"
+def _sibling_adapters() -> Any:
+    """provider_adapters.py from this directory, or None when it cannot be loaded."""
     try:
         import importlib.util
 
@@ -1346,16 +1367,60 @@ def _price_line(job: Mapping[str, Any]) -> str:
             "short_drama_provider_adapters", Path(__file__).with_name("provider_adapters.py")
         )
         if spec is None or spec.loader is None:
-            raise ImportError("provider adapters are missing")
+            return None
         adapters = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(adapters)
+    except (ImportError, OSError, SyntaxError):
+        return None
+    return adapters
+
+
+def _price_line(job: Mapping[str, Any]) -> str:
+    """Price of a built-in MiniMax video or gpt-image-2 picture job, from the sibling adapter."""
+    if job["modality"] not in {"video", "image"}:
+        return "按所用服务商的价格计费，本工具不估算"
+    adapters = _sibling_adapters()
+    if adapters is None:
+        return "未能估算，请看对话里的报价"
+    try:
+        if job["modality"] == "image":
+            if str(job["adapter"]) not in adapters._image_profiles(adapters.ADAPTER_CONFIG_FILE):
+                return "按所用服务商的价格计费，本工具不估算"
+            count = len(job["outputs"])
+            return f"{adapters.OPENAI_MODEL} {count} 张，yoyo 中转价 {adapters.gpt_image_price(count):.2f} 元"
         model = adapters._profile_models(adapters.ADAPTER_CONFIG_FILE).get(str(job["adapter"]))
         if model is None:
             return "不是内置 MiniMax 视频模型，本工具不估算"
         price, note = adapters.minimax_job_price(model, job)
-    except (ImportError, OSError, ValueError, AttributeError, SyntaxError):
+    except (OSError, ValueError, AttributeError):
         return "未能估算，请看对话里的报价"
     return f"{model} 官方价 {price:.2f} 元" + (f"（{note}）" if note else "")
+
+
+def _refusal_at_run(job: Mapping[str, Any]) -> str | None:
+    """Why the built-in MiniMax adapter would refuse this video job when it runs.
+
+    `run` finds out only after the creator has confirmed, so the creator would be
+    asked to approve a job that cannot run. None for anything else, including
+    jobs for adapters this tool does not know.
+    """
+    if job["modality"] != "video":
+        return None
+    adapters = _sibling_adapters()
+    if adapters is None:
+        return None
+    model = None
+    try:
+        model = adapters._profile_models(adapters.ADAPTER_CONFIG_FILE).get(str(job["adapter"]))
+        if model is None:
+            return None
+        adapters.check_minimax_video_job(job, model)
+    except ValueError as exc:
+        name = str(model or job["adapter"])
+        return str(exc) if str(exc).startswith(name) else f"{name}: {exc}"
+    except (OSError, AttributeError):
+        return None
+    return None
 
 
 def _dialog_message(job: Mapping[str, Any]) -> str:
